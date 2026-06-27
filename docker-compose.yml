@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    container_name: sgi
+    restart: unless-stopped
+    # Publica a porta SÓ no localhost do VPS (127.0.0.1).
+    # Quem fala com o mundo é o Nginx; o container fica protegido atrás dele.
+    ports:
+      - "127.0.0.1:3000:3000"
+    # Quando tivermos banco e segredos, eles entram aqui:
+    # env_file:
+    #   - .env
