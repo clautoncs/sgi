@@ -36,6 +36,18 @@ export default function DashboardLayout({
               </svg>
               {sidebarOpen && <span>Painel</span>}
             </a>
+            <a href="/dashboard/vendas" className="nav-item">
+              <svg className="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
+              </svg>
+              {sidebarOpen && <span>Vendas</span>}
+            </a>
+            <a href="/dashboard/configuracoes/metas" className="nav-item">
+              <svg className="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/>
+              </svg>
+              {sidebarOpen && <span>Metas</span>}
+            </a>
             <a href="/dashboard/integrations" className="nav-item">
               <svg className="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2L2 7l10 5 10-5-10-5z"/>

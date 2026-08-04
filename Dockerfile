@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/
 # Instala dependências (com o schema já presente para o Prisma gerar o cliente).
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
-RUN npm ci
+RUN npm install
 RUN npx prisma generate
 
 # Copia o resto e gera o build de produção.
