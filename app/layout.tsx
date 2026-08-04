@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
 import "./globals.css";
-import "./login/login.css";
+import "./login.css";
 
 export const metadata: Metadata = {
   title: "SGI — Sistema de Gerenciamento iLinked",
