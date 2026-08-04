@@ -501,3 +501,69 @@
     display: none;
   }
 }
+
+/* ============================================================
+   Sidebar Expandable Menu (Configurações)
+   ============================================================ */
+
+.nav-item--expandable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item--expandable:hover {
+  background: rgba(77, 159, 255, 0.08);
+  color: var(--text);
+}
+
+.nav-item__arrow {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.nav-item__arrow--open {
+  transform: rotate(180deg);
+}
+
+.nav-submenu {
+  padding-left: 12px;
+  margin-top: 2px;
+}
+
+.nav-item--sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.nav-item--sub:hover {
+  background: rgba(77, 159, 255, 0.08);
+  color: var(--text);
+}
+
+.nav-item--sub .nav-item__icon {
+  width: 15px;
+  height: 15px;
+}
