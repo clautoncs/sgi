@@ -1,42 +1,65 @@
-const VERSAO = '0.1.0';
+"use client";
 
-export default function Home() {
+import { useSession, signOut } from "next-auth/react";
+
+export default function HomePage() {
+  const { data: session } = useSession();
+
   return (
     <main className="screen">
       <div className="panel">
-        <header className="panel__head">
-          <span className="eyebrow">PCBH Informática</span>
+        <div className="panel__head">
+          <span className="eyebrow">Sistema de Gerenciamento</span>
           <h1 className="title">
             SGI<span className="title__dot">.</span>
           </h1>
-          <p className="subtitle">Sistema de Gestão Integrado</p>
-        </header>
+          <p className="subtitle">iLinked — Plataforma de Dashboards</p>
+        </div>
 
-        <div className="readout" role="status" aria-label="Estado do sistema">
+        <div className="readout">
           <div className="row">
-            <span className="row__label">Estado</span>
+            <span className="row__label">Status</span>
             <span className="row__value row__value--ok">
-              <span className="dot" aria-hidden="true" />
-              No ar
+              <span className="dot"></span>
+              Online
             </span>
           </div>
           <div className="row">
-            <span className="row__label">Ambiente</span>
-            <span className="row__value">Produção</span>
+            <span className="row__label">Usuário</span>
+            <span className="row__value">{session?.user?.name || "—"}</span>
           </div>
           <div className="row">
-            <span className="row__label">Servidor</span>
-            <span className="row__value">VPS · Docker</span>
+            <span className="row__label">Email</span>
+            <span className="row__value">{session?.user?.email || "—"}</span>
           </div>
           <div className="row">
-            <span className="row__label">Versão</span>
-            <span className="row__value">{VERSAO}</span>
+            <span className="row__label">Perfil</span>
+            <span className="row__value">{(session?.user as any)?.role || "—"}</span>
           </div>
         </div>
 
         <p className="note">
-          Infraestrutura no ar. Próximo passo: ligar o banco e construir os módulos.
+          Autenticado com sucesso. Os módulos de dashboards serão adicionados aqui.
         </p>
+
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          style={{
+            marginTop: "20px",
+            width: "100%",
+            padding: "10px",
+            background: "rgba(248, 81, 73, 0.1)",
+            border: "1px solid rgba(248, 81, 73, 0.3)",
+            borderRadius: "8px",
+            color: "#f85149",
+            fontSize: "13px",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "var(--sans)",
+          }}
+        >
+          Sair
+        </button>
 
         <footer className="panel__foot">
           R. Malaga, 53 — Santa Cruz Industrial, Contagem · MG
