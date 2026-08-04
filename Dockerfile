@@ -1,35 +1,42 @@
 # ---------- Etapa 1: build ----------
-# Compila a aplicação. Esta etapa é "descartada" no fim — só aproveitamos
-# o resultado, deixando a imagem final pequena.
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
-# Copia só os manifestos primeiro (melhora o cache do Docker:
-# só reinstala dependências quando o package.json muda).
-COPY package.json package-lock.json ./
-RUN npm ci
+# openssl é exigido pelo Prisma.
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copia o resto do código e gera o build de produção.
+# Instala dependências (com o schema já presente para o Prisma gerar o cliente).
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci
+RUN npx prisma generate
+
+# Copia o resto e gera o build de produção.
 COPY . .
 RUN npm run build
 
 # ---------- Etapa 2: produção ----------
-# Imagem final, só com o necessário para rodar.
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Porta interna do container (o Nginx vai falar com ela).
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Roda como usuário sem privilégios (segurança).
-RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -S nextjs
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copia o build standalone (o servidor + só as dependências usadas).
+# Usuário sem privilégios (segurança).
+RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs
+
+# Build standalone enxuto.
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Motor e cliente do Prisma (garante que o app fala com o banco em produção).
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 USER nextjs
 EXPOSE 3000

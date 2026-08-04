@@ -8,7 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "next": "^16.2.9",
+    "next-auth": "^4.24.15",
+    "prisma": "^6.19.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

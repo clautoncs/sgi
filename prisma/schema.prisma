@@ -1,0 +1,189 @@
+// SGI - Sistema de Gerenciamento iLinked
+// Schema Prisma: Autenticação, Permissionamento, Fontes de Dados
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// AUTENTICAÇÃO E SESSÕES
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String?   // null quando login é via SSO
+  avatar        String?
+  provider      String    @default("local") // local | google
+  providerId    String?   // ID do provedor SSO (Google sub)
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relações
+  role          Role      @relation(fields: [roleId], references: [id])
+  roleId        String
+  sessions      Session[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+
+  @@map("sessions")
+}
+
+// ============================================================
+// PERMISSIONAMENTO (RBAC)
+// ============================================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique  // admin, manager, viewer, custom
+  label       String             // Nome amigável: Administrador, Gerente, etc.
+  description String?
+  isSystem    Boolean  @default(false) // roles do sistema não podem ser deletadas
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relações
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique  // ex: dashboard.view, users.manage, settings.edit
+  label       String             // Nome amigável
+  module      String             // Agrupamento: dashboard, users, settings, sources
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relações
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId       String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permissionId String
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================
+// FONTES DE DADOS E INTEGRAÇÕES
+// ============================================================
+
+model DataSource {
+  id          String   @id @default(cuid())
+  name        String             // Nome amigável: "Google Ads", "Meta Ads", etc.
+  type        String             // api, database, spreadsheet, webhook
+  provider    String             // google_ads, meta, sheets, custom
+  config      String   @db.Text  // JSON com configurações (URLs, tokens criptografados)
+  isActive    Boolean  @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relações
+  dashboards  DashboardSource[]
+
+  @@map("data_sources")
+}
+
+// ============================================================
+// DASHBOARDS
+// ============================================================
+
+model Dashboard {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  config      String?  @db.Text  // JSON com layout, widgets, filtros
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relações
+  sources     DashboardSource[]
+
+  @@map("dashboards")
+}
+
+model DashboardSource {
+  dashboard    Dashboard  @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  dashboardId  String
+  dataSource   DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  dataSourceId String
+
+  // Config específica desta fonte neste dashboard (queries, filtros)
+  config       String?    @db.Text
+
+  @@id([dashboardId, dataSourceId])
+  @@map("dashboard_sources")
+}
+
+// ============================================================
+// CONFIGURAÇÕES DO SISTEMA
+// ============================================================
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique  // ex: app.name, app.logo, theme.primary_color
+  value       String   @db.Text
+  type        String   @default("string") // string, number, boolean, json
+  group       String   @default("general") // general, appearance, auth, integrations
+  label       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// ============================================================
+// AUDITORIA
+// ============================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String             // login, logout, create, update, delete
+  entity     String?            // user, dashboard, source, setting
+  entityId   String?
+  details    String?  @db.Text  // JSON com detalhes da ação
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId     String?
+
+  @@map("audit_logs")
+}
