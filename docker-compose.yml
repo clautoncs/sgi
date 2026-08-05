@@ -6,6 +6,7 @@ services:
     env_file:
       - .env
     volumes:
+      - /root/metas.json:/app/metas.json
       - /root/google-credentials.json:/app/google-credentials.json:ro
     ports:
       - "127.0.0.1:3000:3000"

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Area, AreaChart, Legend
+  ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Area, Legend
 } from 'recharts';
 import './vendas.css';
 
@@ -365,7 +365,7 @@ export default function VendasDashboard() {
         {metaGeral > 0 ? (
           <div className="chart-wrapper">
             <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+              <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
                 <defs>
                   <linearGradient id="gradientReal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -389,25 +389,6 @@ export default function VendasDashboard() {
                   domain={[0, metaGeral]}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine
-                  y={metaGeral}
-                  stroke="#f97316"
-                  strokeDasharray="4 4"
-                  strokeWidth={1}
-                  label={{ value: 'META TOTAL', position: 'right', fill: '#f97316', fontSize: 10 }}
-                />
-                <Line
-                  type="linear"
-                  dataKey="metaAcumulada"
-                  stroke="#f97316"
-                  strokeWidth={2.5}
-                  strokeDasharray="8 4"
-                  dot={false}
-                  activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }}
-                  name="Meta Acumulada"
-                  animationDuration={1500}
-                  animationEasing="ease-in-out"
-                />
                 <Area
                   type="monotone"
                   dataKey="vendasAcumuladas"
@@ -421,7 +402,19 @@ export default function VendasDashboard() {
                   animationEasing="ease-in-out"
                   connectNulls={false}
                 />
-              </AreaChart>
+                <Line
+                  type="linear"
+                  dataKey="metaAcumulada"
+                  stroke="#f97316"
+                  strokeWidth={2.5}
+                  strokeDasharray="8 4"
+                  dot={false}
+                  activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }}
+                  name="Meta Acumulada"
+                  animationDuration={1500}
+                  animationEasing="ease-in-out"
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         ) : (
