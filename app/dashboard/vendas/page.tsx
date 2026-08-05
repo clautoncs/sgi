@@ -401,9 +401,18 @@ export default function VendasDashboard() {
                 />
               )}
 
-              {/* Pontos nos dados reais */}
+              {/* Pontos nos dados reais - tooltip aparece no hover */}
               {realPoints.map((p, i) => (
-                <g key={i}>
+                <g key={i} className="chart-point-group">
+                  {/* Área de hover maior (invisível) */}
+                  <circle
+                    cx={xScale(p.dia)}
+                    cy={yScale(p.valor)}
+                    r="14"
+                    fill="transparent"
+                    className="chart-point-hover-area"
+                  />
+                  {/* Ponto visível */}
                   <circle
                     cx={xScale(p.dia)}
                     cy={yScale(p.valor)}
@@ -411,19 +420,32 @@ export default function VendasDashboard() {
                     fill="#10b981"
                     stroke="#0f172a"
                     strokeWidth="2"
+                    className="chart-point-dot"
                   />
-                  {/* Tooltip value */}
-                  <text
-                    x={xScale(p.dia)}
-                    y={yScale(p.valor) - 12}
-                    textAnchor="middle"
-                    fill="#e2e8f0"
-                    fontSize="10"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    {p.valor >= 1000 ? `${(p.valor / 1000).toFixed(1)}k` : p.valor.toFixed(0)}
-                  </text>
+                  {/* Tooltip - aparece no hover */}
+                  <g className="chart-point-tooltip">
+                    <rect
+                      x={xScale(p.dia) - 40}
+                      y={yScale(p.valor) - 32}
+                      width="80"
+                      height="22"
+                      rx="4"
+                      fill="#1e293b"
+                      stroke="#475569"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={xScale(p.dia)}
+                      y={yScale(p.valor) - 17}
+                      textAnchor="middle"
+                      fill="#e2e8f0"
+                      fontSize="11"
+                      fontFamily="monospace"
+                      fontWeight="bold"
+                    >
+                      {formatCurrency(p.valor)}
+                    </text>
+                  </g>
                 </g>
               ))}
 

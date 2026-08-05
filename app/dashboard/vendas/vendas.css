@@ -285,6 +285,30 @@
   font-weight: 600;
 }
 
+/* Chart Point Hover Tooltip */
+.chart-point-group {
+  cursor: pointer;
+}
+
+.chart-point-tooltip {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.chart-point-group:hover .chart-point-tooltip {
+  opacity: 1;
+}
+
+.chart-point-group:hover .chart-point-dot {
+  r: 7;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
+}
+
+.chart-point-hover-area {
+  cursor: pointer;
+}
+
 /* Spinner */
 .spinner {
   width: 40px;
