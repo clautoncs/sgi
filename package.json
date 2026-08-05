@@ -16,7 +16,9 @@
     "prisma": "^6.19.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "googleapis": "^146.0.0"
+    "googleapis": "^146.0.0",
+    "recharts": "^2.15.3",
+    "framer-motion": "^12.12.1"
   },
   "devDependencies": {
     "@types/node": "20.14.13",
