@@ -104,20 +104,39 @@ export default function VendasDashboard() {
     });
   }
 
-  // Calcular dados do gráfico
-  const getMetaDiaria = () => {
-    if (!metas?.metaGeral) return 0;
-    const diasNoMes = new Date(
-      parseInt(mesSelecionado.split('-')[0]),
-      parseInt(mesSelecionado.split('-')[1]),
-      0
-    ).getDate();
-    return metas.metaGeral / diasNoMes;
+  // Total de dias no mês selecionado
+  const getDiasNoMes = () => {
+    const [ano, mes] = mesSelecionado.split('-').map(Number);
+    return new Date(ano, mes, 0).getDate();
   };
 
   const getProgressoMeta = () => {
     if (!dados || !metas?.metaGeral) return 0;
     return (dados.totalVendas / metas.metaGeral) * 100;
+  };
+
+  // Gerar dados para o gráfico de linhas
+  const getChartData = () => {
+    const diasNoMes = getDiasNoMes();
+    const metaGeral = metas?.metaGeral || 0;
+    
+    // Linha de referência: do dia 1 ao último dia, de 0 até a meta
+    // Cada dia tem um valor proporcional
+    const refPoints: { dia: number; valor: number }[] = [];
+    for (let d = 1; d <= diasNoMes; d++) {
+      refPoints.push({ dia: d, valor: (metaGeral / diasNoMes) * d });
+    }
+
+    // Linha real: acumulado por dia (baseado nos dados reais)
+    const realPoints: { dia: number; valor: number }[] = [];
+    if (dados?.evolucaoAcumulada) {
+      dados.evolucaoAcumulada.forEach((item) => {
+        const diaNum = parseInt(item.dia.split('/')[0]);
+        realPoints.push({ dia: diaNum, valor: item.valor });
+      });
+    }
+
+    return { refPoints, realPoints, diasNoMes, metaGeral };
   };
 
   if (loading) {
@@ -138,6 +157,67 @@ export default function VendasDashboard() {
       </div>
     );
   }
+
+  const chartData = getChartData();
+  const { refPoints, realPoints, diasNoMes, metaGeral } = chartData;
+
+  // SVG chart dimensions
+  const chartWidth = 800;
+  const chartHeight = 280;
+  const paddingLeft = 80;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 40;
+  const plotWidth = chartWidth - paddingLeft - paddingRight;
+  const plotHeight = chartHeight - paddingTop - paddingBottom;
+
+  // Scale functions
+  const xScale = (dia: number) => paddingLeft + ((dia - 1) / (diasNoMes - 1)) * plotWidth;
+  const yScale = (valor: number) => paddingTop + plotHeight - (valor / metaGeral) * plotHeight;
+
+  // Gerar path da linha de referência (laranja tracejada)
+  const refPath = refPoints.map((p, i) => {
+    const x = xScale(p.dia);
+    const y = yScale(p.valor);
+    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+  }).join(' ');
+
+  // Gerar path da linha real (sólida)
+  const realPath = realPoints.length > 0
+    ? realPoints.map((p, i) => {
+        const x = xScale(p.dia);
+        const y = yScale(p.valor);
+        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+      }).join(' ')
+    : '';
+
+  // Gerar path do preenchimento (area fill)
+  const realFillPath = realPoints.length > 0
+    ? `${realPoints.map((p, i) => {
+        const x = xScale(p.dia);
+        const y = yScale(p.valor);
+        return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+      }).join(' ')} L ${xScale(realPoints[realPoints.length - 1].dia)} ${yScale(0)} L ${xScale(realPoints[0].dia)} ${yScale(0)} Z`
+    : '';
+
+  // Y-axis labels
+  const yLabels = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    value: metaGeral * f,
+    y: yScale(metaGeral * f),
+  }));
+
+  // X-axis labels (a cada 5 dias)
+  const xLabels: { dia: number; x: number }[] = [];
+  for (let d = 1; d <= diasNoMes; d += 5) {
+    xLabels.push({ dia: d, x: xScale(d) });
+  }
+  if (xLabels[xLabels.length - 1]?.dia !== diasNoMes) {
+    xLabels.push({ dia: diasNoMes, x: xScale(diasNoMes) });
+  }
+
+  // Dia atual (para marcador)
+  const hoje = new Date().getDate();
+  const diaAtualNoGrafico = Math.min(hoje, diasNoMes);
 
   return (
     <div className="vendas-dashboard">
@@ -216,40 +296,173 @@ export default function VendasDashboard() {
         </div>
       </div>
 
-      {/* Gráfico de Evolução */}
+      {/* Gráfico de Evolução - SVG Line Chart */}
       <div className="vendas-section">
         <h2>Evolução Diária vs Meta</h2>
         <div className="grafico-container">
-          <div className="grafico-evolucao">
-            {dados?.evolucaoAcumulada && dados.evolucaoAcumulada.length > 0 ? (
-              <div className="grafico-barras">
-                {dados.evolucaoAcumulada.map((dia, idx) => {
-                  const maxVal = Math.max(metas?.metaGeral || 0, dados.totalVendas);
-                  const alturaReal = maxVal > 0 ? (dia.valor / maxVal) * 100 : 0;
-                  const metaDiaria = getMetaDiaria() * (idx + 1);
-                  const alturaMeta = maxVal > 0 ? (metaDiaria / maxVal) * 100 : 0;
-                  
-                  return (
-                    <div key={dia.dia} className="grafico-dia" title={`${dia.dia}: ${formatCurrency(dia.valor)}`}>
-                      <div className="barra-container">
-                        <div className="barra-meta" style={{ height: `${Math.min(alturaMeta, 100)}%` }}></div>
-                        <div 
-                          className={`barra-real ${dia.valor >= metaDiaria ? 'acima' : 'abaixo'}`}
-                          style={{ height: `${Math.min(alturaReal, 100)}%` }}
-                        ></div>
-                      </div>
-                      <span className="dia-label">{dia.dia.split('/')[0]}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="no-data">Sem dados de evolução disponíveis</p>
-            )}
-          </div>
+          {metaGeral > 0 ? (
+            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="chart-svg" preserveAspectRatio="xMidYMid meet">
+              {/* Grid lines horizontais */}
+              {yLabels.map((label, i) => (
+                <g key={i}>
+                  <line
+                    x1={paddingLeft}
+                    y1={label.y}
+                    x2={chartWidth - paddingRight}
+                    y2={label.y}
+                    stroke="#334155"
+                    strokeWidth="0.5"
+                    strokeDasharray={i === yLabels.length - 1 ? "none" : "4 4"}
+                  />
+                  <text
+                    x={paddingLeft - 10}
+                    y={label.y + 4}
+                    textAnchor="end"
+                    fill="#64748b"
+                    fontSize="11"
+                    fontFamily="monospace"
+                  >
+                    {label.value >= 1000 ? `${(label.value / 1000).toFixed(0)}k` : label.value.toFixed(0)}
+                  </text>
+                </g>
+              ))}
+
+              {/* X-axis labels */}
+              {xLabels.map((label, i) => (
+                <text
+                  key={i}
+                  x={label.x}
+                  y={chartHeight - 10}
+                  textAnchor="middle"
+                  fill="#64748b"
+                  fontSize="11"
+                  fontFamily="monospace"
+                >
+                  {String(label.dia).padStart(2, '0')}
+                </text>
+              ))}
+
+              {/* Linha vertical do dia atual */}
+              <line
+                x1={xScale(diaAtualNoGrafico)}
+                y1={paddingTop}
+                x2={xScale(diaAtualNoGrafico)}
+                y2={paddingTop + plotHeight}
+                stroke="#475569"
+                strokeWidth="1"
+                strokeDasharray="2 3"
+              />
+              <text
+                x={xScale(diaAtualNoGrafico)}
+                y={paddingTop - 6}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize="10"
+                fontFamily="monospace"
+              >
+                HOJE
+              </text>
+
+              {/* Linha de referência (laranja tracejada) - onde deveríamos estar */}
+              <path
+                d={refPath}
+                fill="none"
+                stroke="#f97316"
+                strokeWidth="2.5"
+                strokeDasharray="8 5"
+                strokeLinecap="round"
+              />
+
+              {/* Preenchimento da área real (gradiente) */}
+              {realFillPath && (
+                <>
+                  <defs>
+                    <linearGradient id="realGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0.05" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d={realFillPath}
+                    fill="url(#realGradient)"
+                  />
+                </>
+              )}
+
+              {/* Linha real (sólida verde) - onde estamos */}
+              {realPath && (
+                <path
+                  d={realPath}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* Pontos nos dados reais */}
+              {realPoints.map((p, i) => (
+                <g key={i}>
+                  <circle
+                    cx={xScale(p.dia)}
+                    cy={yScale(p.valor)}
+                    r="5"
+                    fill="#10b981"
+                    stroke="#0f172a"
+                    strokeWidth="2"
+                  />
+                  {/* Tooltip value */}
+                  <text
+                    x={xScale(p.dia)}
+                    y={yScale(p.valor) - 12}
+                    textAnchor="middle"
+                    fill="#e2e8f0"
+                    fontSize="10"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                  >
+                    {p.valor >= 1000 ? `${(p.valor / 1000).toFixed(1)}k` : p.valor.toFixed(0)}
+                  </text>
+                </g>
+              ))}
+
+              {/* Label meta no final */}
+              <text
+                x={chartWidth - paddingRight + 5}
+                y={yScale(metaGeral) + 4}
+                textAnchor="start"
+                fill="#f97316"
+                fontSize="10"
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                META
+              </text>
+
+              {/* Eixo Y label */}
+              <text
+                x={12}
+                y={chartHeight / 2}
+                textAnchor="middle"
+                fill="#64748b"
+                fontSize="10"
+                fontFamily="monospace"
+                transform={`rotate(-90, 12, ${chartHeight / 2})`}
+              >
+                VALOR (R$)
+              </text>
+            </svg>
+          ) : (
+            <p className="no-data">Configure a meta do mês para visualizar o gráfico de evolução</p>
+          )}
           <div className="grafico-legenda">
-            <span className="legenda-item"><span className="legenda-cor real"></span> Realizado</span>
-            <span className="legenda-item"><span className="legenda-cor meta"></span> Meta Projetada</span>
+            <span className="legenda-item">
+              <span className="legenda-cor legenda-real-line"></span> Posição Atual (realizado)
+            </span>
+            <span className="legenda-item">
+              <span className="legenda-cor legenda-ref-line"></span> Referência (onde deveríamos estar)
+            </span>
           </div>
         </div>
       </div>
