@@ -57,12 +57,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return (
       <div className="chart-custom-tooltip">
         <p className="tooltip-label">Dia {label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <p key={idx} className="tooltip-value" style={{ color: entry.color }}>
-            <span className="tooltip-dot" style={{ background: entry.color }}></span>
-            {entry.name}: {formatCurrency(entry.value)}
-          </p>
-        ))}
+        {payload.map((entry: any, idx: number) => {
+          if (entry.value === undefined || entry.value === null) return null;
+          const labelText = entry.dataKey === 'referencia'
+            ? `Meta acumulada`
+            : 'Realizado';
+          return (
+            <p key={idx} className="tooltip-value" style={{ color: entry.color }}>
+              <span className="tooltip-dot" style={{ background: entry.color }}></span>
+              {labelText}: {formatCurrency(entry.value)}
+            </p>
+          );
+        })}
       </div>
     );
   }
@@ -158,7 +164,6 @@ export default function VendasDashboard() {
   const getChartData = () => {
     const diasNoMes = getDiasNoMes();
     const metaGeral = metas?.metaGeral || 0;
-    const metaDiaria = metaGeral / diasNoMes;
 
     // Criar array com todos os dias do mês
     const chartData = [];
@@ -175,7 +180,9 @@ export default function VendasDashboard() {
     const hoje = new Date().getDate();
 
     for (let d = 1; d <= diasNoMes; d++) {
-      const referencia = metaDiaria * d;
+      // Referência: reta diagonal de 0 até a meta total
+      // Dia 1 = metaGeral/diasNoMes, Dia final = metaGeral
+      const referencia = (metaGeral / diasNoMes) * d;
       let realizado: number | undefined = undefined;
 
       if (realMap[d] !== undefined) {
@@ -383,12 +390,12 @@ export default function VendasDashboard() {
                   label={{ value: 'META', position: 'right', fill: '#f97316', fontSize: 11 }}
                 />
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="referencia"
                   stroke="#f97316"
                   strokeWidth={2.5}
                   strokeDasharray="8 4"
-                  dot={{ r: 3, fill: '#f97316', stroke: '#0f172a', strokeWidth: 1.5 }}
+                  dot={false}
                   activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }}
                   name="Referência"
                   animationDuration={1500}
