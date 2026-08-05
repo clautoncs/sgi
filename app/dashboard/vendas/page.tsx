@@ -250,7 +250,21 @@ export default function VendasDashboard() {
   const chartData = getChartData();
   const metaGeral = metas?.metaGeral || 0;
 
+  // Calcular vendas do dia
+  const hoje = new Date();
+  const diaHoje = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  const vendasHoje = dados?.ultimasVendas?.filter(v => v.data === diaHoje) || [];
+  const totalVendasDia = vendasHoje.reduce((acc, v) => acc + v.valor, 0);
+
   const cards = [
+    {
+      key: 'vendas-dia',
+      className: 'card-dia',
+      icon: '☀️',
+      label: 'Total Vendas Dia',
+      value: formatCurrency(totalVendasDia),
+      sub: `${vendasHoje.length} vendas hoje`,
+    },
     {
       key: 'total',
       className: 'card-total',

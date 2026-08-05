@@ -187,6 +187,7 @@
   height: 4px;
 }
 
+.card-dia::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .card-total::before { background: linear-gradient(90deg, #10b981, #34d399); }
 .card-meta::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
 .card-faltante::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
