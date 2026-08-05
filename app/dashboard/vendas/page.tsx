@@ -59,9 +59,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <p className="tooltip-label">Dia {label}</p>
         {payload.map((entry: any, idx: number) => {
           if (entry.value === undefined || entry.value === null) return null;
-          const labelText = entry.dataKey === 'referencia'
-            ? `Meta acumulada`
-            : 'Realizado';
+          const labelText = entry.dataKey === 'metaAcumulada'
+            ? 'Meta acumulada'
+            : 'Vendas acumuladas';
           return (
             <p key={idx} className="tooltip-value" style={{ color: entry.color }}>
               <span className="tooltip-dot" style={{ background: entry.color }}></span>
@@ -164,39 +164,46 @@ export default function VendasDashboard() {
   const getChartData = () => {
     const diasNoMes = getDiasNoMes();
     const metaGeral = metas?.metaGeral || 0;
+    const metaDiaria = metaGeral / diasNoMes; // meta proporcional por dia
 
     // Criar array com todos os dias do mês
     const chartData = [];
-    const realMap: Record<number, number> = {};
+    const realAcumMap: Record<number, number> = {}; // valor acumulado real
     
     if (dados?.evolucaoAcumulada) {
       dados.evolucaoAcumulada.forEach((item) => {
         const diaNum = parseInt(item.dia.split('/')[0]);
-        realMap[diaNum] = item.valor;
+        realAcumMap[diaNum] = item.valor;
       });
     }
 
-    let lastRealValue: number | null = null;
     const hoje = new Date().getDate();
+    let lastRealAcum: number | null = null;
 
     for (let d = 1; d <= diasNoMes; d++) {
-      // Referência: reta diagonal de 0 até a meta total
-      // Dia 1 = metaGeral/diasNoMes, Dia final = metaGeral
-      const referencia = (metaGeral / diasNoMes) * d;
-      let realizado: number | undefined = undefined;
+      // Meta acumulada: (meta total / dias no mês) * dia
+      // Reta de 0 até metaGeral no último dia
+      const metaAcumulada = Math.round(metaDiaria * d * 100) / 100;
 
-      if (realMap[d] !== undefined) {
-        lastRealValue = realMap[d];
-        realizado = realMap[d];
-      } else if (d <= hoje && lastRealValue !== null) {
-        // Preencher dias sem venda com o último valor acumulado (até hoje)
-        realizado = lastRealValue;
+      // Vendas acumuladas reais até o dia
+      let vendasAcumuladas: number | undefined = undefined;
+
+      if (d <= hoje) {
+        if (realAcumMap[d] !== undefined) {
+          lastRealAcum = realAcumMap[d];
+          vendasAcumuladas = realAcumMap[d];
+        } else if (lastRealAcum !== null) {
+          // Dia sem venda: mantém o acumulado anterior
+          vendasAcumuladas = lastRealAcum;
+        } else {
+          vendasAcumuladas = 0;
+        }
       }
 
       chartData.push({
         dia: String(d).padStart(2, '0'),
-        referencia: Math.round(referencia * 100) / 100,
-        realizado: realizado !== undefined ? Math.round(realizado * 100) / 100 : undefined,
+        metaAcumulada,
+        vendasAcumuladas: vendasAcumuladas !== undefined ? Math.round(vendasAcumuladas * 100) / 100 : undefined,
       });
     }
 
@@ -351,8 +358,8 @@ export default function VendasDashboard() {
         <div className="section-header">
           <h2>Evolução Diária vs Meta</h2>
           <div className="section-badges">
-            <span className="badge badge-green">Posição Atual</span>
-            <span className="badge badge-orange">Referência Meta</span>
+            <span className="badge badge-green">Vendas Acumuladas</span>
+            <span className="badge badge-orange">Meta Acumulada</span>
           </div>
         </div>
         {metaGeral > 0 ? (
@@ -387,29 +394,29 @@ export default function VendasDashboard() {
                   stroke="#f97316"
                   strokeDasharray="4 4"
                   strokeWidth={1}
-                  label={{ value: 'META', position: 'right', fill: '#f97316', fontSize: 11 }}
+                  label={{ value: 'META TOTAL', position: 'right', fill: '#f97316', fontSize: 10 }}
                 />
                 <Line
                   type="linear"
-                  dataKey="referencia"
+                  dataKey="metaAcumulada"
                   stroke="#f97316"
                   strokeWidth={2.5}
                   strokeDasharray="8 4"
                   dot={false}
                   activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }}
-                  name="Referência"
+                  name="Meta Acumulada"
                   animationDuration={1500}
                   animationEasing="ease-in-out"
                 />
                 <Area
                   type="monotone"
-                  dataKey="realizado"
+                  dataKey="vendasAcumuladas"
                   stroke="#10b981"
                   strokeWidth={3}
                   fill="url(#gradientReal)"
-                  dot={{ r: 4, fill: '#10b981', stroke: '#0f172a', strokeWidth: 2 }}
+                  dot={false}
                   activeDot={{ r: 7, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
-                  name="Realizado"
+                  name="Vendas Acumuladas"
                   animationDuration={2000}
                   animationEasing="ease-in-out"
                   connectNulls={false}
