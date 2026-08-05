@@ -454,3 +454,135 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   Últimas Vendas — Cards horizontais com scroll
+   ============================================================ */
+
+.ultimas-vendas-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 16px 4px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ultimas-vendas-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ultimas-vendas-container::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
+}
+
+.ultimas-vendas-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.venda-card {
+  min-width: 140px;
+  max-width: 160px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.venda-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.venda-card:hover::before {
+  opacity: 1;
+}
+
+.venda-card:hover {
+  border-color: #10b981;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
+}
+
+.venda-card-expanded {
+  min-width: 260px;
+  max-width: 280px;
+  border-color: #10b981;
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.2);
+}
+
+.venda-card-expanded::before {
+  opacity: 1;
+}
+
+.venda-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.venda-produto {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.venda-valor {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.venda-detalhes {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.detalhe-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.detalhe-row span:first-child {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.detalhe-row span:last-child {
+  color: #e2e8f0;
+  text-align: right;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detalhe-row.lucro span:last-child {
+  color: #10b981;
+  font-weight: 600;
+}

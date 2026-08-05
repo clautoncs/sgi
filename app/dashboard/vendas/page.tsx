@@ -25,6 +25,17 @@ interface EvolucaoDia {
   valorDia: number;
 }
 
+interface UltimaVenda {
+  data: string;
+  vendedor: string;
+  produto: string;
+  valor: number;
+  cliente: string;
+  origem: string;
+  pagamento: string;
+  custo: number;
+}
+
 interface DadosVendas {
   mes: string;
   totalVendas: number;
@@ -35,6 +46,7 @@ interface DadosVendas {
   qtdVendas: number;
   vendedores: VendedorResumo[];
   evolucaoAcumulada: EvolucaoDia[];
+  ultimasVendas: UltimaVenda[];
   diasNoMes: number;
 }
 
@@ -101,6 +113,7 @@ export default function VendasDashboard() {
   const [error, setError] = useState('');
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [vendaSelecionada, setVendaSelecionada] = useState<number | null>(null);
 
   const fetchDados = useCallback(async (silent = false) => {
     try {
@@ -347,6 +360,57 @@ export default function VendasDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Últimas Vendas */}
+      <motion.div
+        className="vendas-section"
+        variants={sectionVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <div className="section-header">
+          <h2>Últimas Vendas</h2>
+          <span className="badge badge-green">{dados?.ultimasVendas?.length || 0} mais recentes</span>
+        </div>
+        <div className="ultimas-vendas-container">
+          <AnimatePresence>
+            {dados?.ultimasVendas?.map((venda, idx) => (
+              <motion.div
+                key={`${venda.data}-${venda.produto}-${idx}`}
+                className={`venda-card ${vendaSelecionada === idx ? 'venda-card-expanded' : ''}`}
+                initial={{ opacity: 0, x: -50, scale: 0.8 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                transition={{ delay: idx * 0.05, duration: 0.3 }}
+                whileHover={{ scale: 1.1, zIndex: 10 }}
+                onClick={() => setVendaSelecionada(vendaSelecionada === idx ? null : idx)}
+                layout
+              >
+                <div className="venda-card-content">
+                  <span className="venda-produto">{venda.produto || 'Produto'}</span>
+                  <span className="venda-valor">{formatCurrency(venda.valor)}</span>
+                </div>
+                {vendaSelecionada === idx && (
+                  <motion.div
+                    className="venda-detalhes"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="detalhe-row"><span>Data:</span><span>{venda.data}</span></div>
+                    <div className="detalhe-row"><span>Vendedor:</span><span>{venda.vendedor}</span></div>
+                    <div className="detalhe-row"><span>Cliente:</span><span>{venda.cliente || '—'}</span></div>
+                    <div className="detalhe-row"><span>Origem:</span><span>{venda.origem || '—'}</span></div>
+                    <div className="detalhe-row"><span>Pagamento:</span><span>{venda.pagamento || '—'}</span></div>
+                    <div className="detalhe-row"><span>Custo:</span><span>{formatCurrency(venda.custo)}</span></div>
+                    <div className="detalhe-row lucro"><span>Lucro:</span><span>{formatCurrency(venda.valor - venda.custo)}</span></div>
+                  </motion.div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </motion.div>
 
       {/* Gráfico de Evolução - Recharts */}
       <motion.div

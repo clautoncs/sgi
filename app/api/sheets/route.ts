@@ -131,6 +131,7 @@ export async function GET(request: Request) {
       qtdVendas: totalQtd,
       vendedores: resumoVendedores,
       evolucaoAcumulada,
+      ultimasVendas: vendas.slice(-10).reverse().map(v => ({ data: v.data, vendedor: v.vendedor, produto: v.produto, valor: v.valor, cliente: v.cliente, origem: v.origem, pagamento: v.pagamento, custo: v.custo })),
       diasNoMes: diasOrdenados.length,
     });
     
