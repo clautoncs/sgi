@@ -66,6 +66,7 @@ export async function GET(request: Request) {
       telefone: row[10] || '',
       sistema: row[13] || '',
       custo: parseFloat((row[14] || '0').toString().replace(/[R$\s.]/g, '').replace(',', '.')) || 0,
+      hora: row[11] || '',
     }));
     
     // Calcular resumo por vendedor
@@ -131,7 +132,7 @@ export async function GET(request: Request) {
       qtdVendas: totalQtd,
       vendedores: resumoVendedores,
       evolucaoAcumulada,
-      ultimasVendas: vendas.slice(-10).reverse().map(v => ({ data: v.data, vendedor: v.vendedor, produto: v.produto, valor: v.valor, cliente: v.cliente, origem: v.origem, pagamento: v.pagamento, custo: v.custo })),
+      ultimasVendas: vendas.slice(-10).reverse().map(v => ({ data: v.data, hora: v.hora, vendedor: v.vendedor, produto: v.produto, valor: v.valor, cliente: v.cliente, origem: v.origem, pagamento: v.pagamento, custo: v.custo })),
       diasNoMes: diasOrdenados.length,
     });
     

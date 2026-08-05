@@ -528,6 +528,17 @@
   opacity: 1;
 }
 
+.venda-data-hora {
+  display: block;
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #1e293b;
+}
+
 .venda-card-content {
   display: flex;
   flex-direction: column;
