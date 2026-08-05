@@ -373,6 +373,51 @@ export default function VendasDashboard() {
                 strokeLinecap="round"
               />
 
+              {/* Pontos na linha de referência - tooltip no hover */}
+              {refPoints.filter((_, i) => i % 5 === 4 || i === 0 || i === refPoints.length - 1).map((p, i) => (
+                <g key={`ref-${i}`} className="chart-point-group chart-point-ref">
+                  <circle
+                    cx={xScale(p.dia)}
+                    cy={yScale(p.valor)}
+                    r="14"
+                    fill="transparent"
+                    className="chart-point-hover-area"
+                  />
+                  <circle
+                    cx={xScale(p.dia)}
+                    cy={yScale(p.valor)}
+                    r="4"
+                    fill="#f97316"
+                    stroke="#0f172a"
+                    strokeWidth="2"
+                    className="chart-point-dot-ref"
+                  />
+                  <g className="chart-point-tooltip">
+                    <rect
+                      x={xScale(p.dia) - 44}
+                      y={yScale(p.valor) - 32}
+                      width="88"
+                      height="22"
+                      rx="4"
+                      fill="#1e293b"
+                      stroke="#f97316"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={xScale(p.dia)}
+                      y={yScale(p.valor) - 17}
+                      textAnchor="middle"
+                      fill="#f97316"
+                      fontSize="11"
+                      fontFamily="monospace"
+                      fontWeight="bold"
+                    >
+                      {formatCurrency(p.valor)}
+                    </text>
+                  </g>
+                </g>
+              ))}
+
               {/* Preenchimento da área real (gradiente) */}
               {realFillPath && (
                 <>

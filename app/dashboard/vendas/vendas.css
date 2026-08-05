@@ -305,6 +305,15 @@
   filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
 }
 
+.chart-point-group:hover .chart-point-dot-ref {
+  r: 6;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6));
+}
+
+.chart-point-dot-ref {
+  transition: r 0.15s ease, filter 0.15s ease;
+}
+
 .chart-point-hover-area {
   cursor: pointer;
 }
