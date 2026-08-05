@@ -1,0 +1,76 @@
+{
+  "pages": [
+    { "code": "dashboard.painel", "label": "Painel Principal", "module": "Dashboard" },
+    { "code": "dashboard.vendas", "label": "Dashboard de Vendas", "module": "Dashboard" },
+    { "code": "config.metas", "label": "Configuração de Metas", "module": "Configurações" },
+    { "code": "config.integracoes", "label": "Integrações", "module": "Configurações" },
+    { "code": "admin.usuarios", "label": "Gerenciar Usuários", "module": "Administração" },
+    { "code": "admin.permissoes", "label": "Gerenciar Permissões", "module": "Administração" }
+  ],
+  "roles": [
+    {
+      "id": "role_sysadmin",
+      "name": "sysadmin",
+      "label": "Administrador do Sistema",
+      "description": "Acesso total a todas as funcionalidades do sistema",
+      "isSystem": true,
+      "permissions": [
+        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": true, "manage": true },
+        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": true, "manage": true },
+        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": true, "manage": true },
+        { "page": "config.integracoes", "label": "Integrações", "view": true, "edit": true, "manage": true },
+        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": true, "edit": true, "manage": true },
+        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": true, "edit": true, "manage": true }
+      ],
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    },
+    {
+      "id": "role_manager",
+      "name": "manager",
+      "label": "Gerente",
+      "description": "Acesso a dashboards e configurações, sem administração",
+      "isSystem": true,
+      "permissions": [
+        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": true, "manage": false },
+        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": true, "manage": true },
+        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": true, "manage": false },
+        { "page": "config.integracoes", "label": "Integrações", "view": true, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
+        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+      ],
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    },
+    {
+      "id": "role_seller",
+      "name": "seller",
+      "label": "Vendedor",
+      "description": "Visualização dos dashboards de vendas apenas",
+      "isSystem": true,
+      "permissions": [
+        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": false, "manage": false },
+        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": false, "manage": false },
+        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": false, "manage": false },
+        { "page": "config.integracoes", "label": "Integrações", "view": false, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
+        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+      ],
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    },
+    {
+      "id": "role_viewer",
+      "name": "viewer",
+      "label": "Visualizador",
+      "description": "Apenas visualização básica do painel",
+      "isSystem": true,
+      "permissions": [
+        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": false, "manage": false },
+        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": false, "manage": false },
+        { "page": "config.metas", "label": "Configuração de Metas", "view": false, "edit": false, "manage": false },
+        { "page": "config.integracoes", "label": "Integrações", "view": false, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
+        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+      ],
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+}

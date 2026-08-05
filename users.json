@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "id": "user_admin_001",
+      "name": "Clauton Sobral",
+      "email": "admin@ilinked.com.br",
+      "avatar": "",
+      "provider": "local",
+      "role": "sysadmin",
+      "isActive": true,
+      "isApproved": true,
+      "lastLoginAt": "2026-08-05T12:00:00.000Z",
+      "createdAt": "2026-07-01T00:00:00.000Z"
+    }
+  ]
+}
