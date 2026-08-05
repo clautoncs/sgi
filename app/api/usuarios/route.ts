@@ -1,140 +1,159 @@
-import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { hash } from 'bcryptjs';
 
-const USERS_FILE = path.join(process.cwd(), 'users.json');
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  provider: 'local' | 'google';
-  role: string;
-  isActive: boolean;
-  isApproved: boolean;
-  lastLoginAt?: string;
-  createdAt: string;
-}
-
-interface UsersDB {
-  users: UserData[];
-}
-
-async function readUsers(): Promise<UsersDB> {
-  try {
-    const data = await fs.readFile(USERS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return { users: [] };
-  }
-}
-
-async function writeUsers(db: UsersDB): Promise<void> {
-  await fs.writeFile(USERS_FILE, JSON.stringify(db, null, 2), 'utf-8');
-}
-
-// GET - Listar todos os usuários
 export async function GET() {
   try {
-    const db = await readUsers();
-    return NextResponse.json(db);
+    const users = await prisma.user.findMany({
+      include: { role: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const roles = await prisma.role.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    const formattedUsers = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      avatar: u.avatar,
+      provider: u.provider || 'local',
+      role: u.role.label,
+      roleId: u.roleId,
+      roleName: u.role.name,
+      isActive: u.isActive,
+      isApproved: u.isActive,
+      lastLoginAt: u.lastLoginAt?.toISOString() || null,
+      createdAt: u.createdAt.toISOString(),
+    }));
+
+    return NextResponse.json({ users: formattedUsers, roles });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro ao buscar usuários', details: error.message }, { status: 500 });
+    console.error('Erro ao buscar usuários:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// POST - Criar ou atualizar usuário
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...userData } = body;
-    const db = await readUsers();
 
     if (action === 'create') {
-      const exists = db.users.find(u => u.email === userData.email);
-      if (exists) {
-        return NextResponse.json({ error: 'Usuário já existe com este email' }, { status: 400 });
+      const { name, email, role: roleId, password } = userData;
+      
+      if (!name || !email) {
+        return NextResponse.json({ error: 'Nome e email são obrigatórios' }, { status: 400 });
       }
-      const newUser: UserData = {
-        id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        name: userData.name,
-        email: userData.email,
-        avatar: userData.avatar || '',
-        provider: userData.provider || 'local',
-        role: userData.role || 'viewer',
-        isActive: true,
-        isApproved: userData.provider === 'local' ? true : false,
-        createdAt: new Date().toISOString(),
-      };
-      db.users.push(newUser);
-      await writeUsers(db);
-      return NextResponse.json({ success: true, user: newUser });
-    }
 
-    if (action === 'approve') {
-      const user = db.users.find(u => u.id === userData.id);
-      if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-      user.isApproved = true;
-      user.isActive = true;
-      await writeUsers(db);
-      return NextResponse.json({ success: true, user });
-    }
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return NextResponse.json({ error: 'Email já cadastrado' }, { status: 400 });
+      }
 
-    if (action === 'block') {
-      const user = db.users.find(u => u.id === userData.id);
-      if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-      user.isActive = false;
-      user.isApproved = false;
-      await writeUsers(db);
-      return NextResponse.json({ success: true, user });
+      // Buscar role pelo nome ou ID
+      let targetRole = await prisma.role.findFirst({ where: { id: roleId } });
+      if (!targetRole) {
+        targetRole = await prisma.role.findFirst({ where: { name: roleId } });
+      }
+      if (!targetRole) {
+        targetRole = await prisma.role.findFirst({ where: { name: 'viewer' } });
+      }
+
+      const hashedPassword = password ? await hash(password, 12) : null;
+
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          provider: 'local',
+          isActive: true,
+          roleId: targetRole!.id,
+        },
+        include: { role: true },
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          provider: user.provider,
+          isActive: user.isActive,
+          isApproved: true,
+          role: user.role.label,
+          roleId: user.roleId,
+          roleName: user.role.name,
+          createdAt: user.createdAt.toISOString(),
+        }
+      });
     }
 
     if (action === 'update') {
-      const user = db.users.find(u => u.id === userData.id);
-      if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-      if (userData.name) user.name = userData.name;
-      if (userData.role) user.role = userData.role;
-      if (userData.isActive !== undefined) user.isActive = userData.isActive;
-      if (userData.isApproved !== undefined) user.isApproved = userData.isApproved;
-      await writeUsers(db);
-      return NextResponse.json({ success: true, user });
+      const { id, name, role: roleId } = userData;
+      
+      if (!id) {
+        return NextResponse.json({ error: 'ID do usuário é obrigatório' }, { status: 400 });
+      }
+
+      const updateData: any = {};
+      if (name) updateData.name = name;
+      if (roleId) {
+        let targetRole = await prisma.role.findFirst({ where: { id: roleId } });
+        if (!targetRole) {
+          targetRole = await prisma.role.findFirst({ where: { name: roleId } });
+        }
+        if (targetRole) updateData.roleId = targetRole.id;
+      }
+
+      const user = await prisma.user.update({
+        where: { id },
+        data: updateData,
+        include: { role: true },
+      });
+
+      return NextResponse.json({ success: true, user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role.label,
+        roleId: user.roleId,
+      }});
     }
 
-    if (action === 'delete') {
-      db.users = db.users.filter(u => u.id !== userData.id);
-      await writeUsers(db);
+    if (action === 'approve') {
+      const { id } = userData;
+      await prisma.user.update({
+        where: { id },
+        data: { isActive: true },
+      });
       return NextResponse.json({ success: true });
     }
 
-    // Registrar tentativa de login SSO (chamado pelo NextAuth callback)
-    if (action === 'sso_attempt') {
-      const existing = db.users.find(u => u.email === userData.email);
-      if (!existing) {
-        const newUser: UserData = {
-          id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          name: userData.name,
-          email: userData.email,
-          avatar: userData.avatar || '',
-          provider: 'google',
-          role: 'viewer',
-          isActive: false,
-          isApproved: false,
-          lastLoginAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        };
-        db.users.push(newUser);
-        await writeUsers(db);
-        return NextResponse.json({ success: true, approved: false, user: newUser });
-      }
-      existing.lastLoginAt = new Date().toISOString();
-      if (userData.avatar) existing.avatar = userData.avatar;
-      await writeUsers(db);
-      return NextResponse.json({ success: true, approved: existing.isApproved, user: existing });
+    if (action === 'block') {
+      const { id } = userData;
+      await prisma.user.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'delete') {
+      const { id } = userData;
+      // Deletar sessões primeiro
+      await prisma.session.deleteMany({ where: { userId: id } });
+      await prisma.auditLog.deleteMany({ where: { userId: id } });
+      await prisma.user.delete({ where: { id } });
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: 'Erro ao processar', details: error.message }, { status: 500 });
+    console.error('Erro na ação de usuário:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

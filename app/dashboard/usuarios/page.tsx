@@ -34,14 +34,10 @@ export default function UsuariosPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [usersRes, rolesRes] = await Promise.all([
-        fetch('/api/usuarios'),
-        fetch('/api/permissoes'),
-      ]);
+      const usersRes = await fetch('/api/usuarios');
       const usersData = await usersRes.json();
-      const rolesData = await rolesRes.json();
       setUsers(usersData.users || []);
-      setRoles(rolesData.roles || []);
+      setRoles(usersData.roles || []);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -82,7 +78,7 @@ export default function UsuariosPage() {
   const pendingCount = users.filter(u => !u.isApproved).length;
 
   const getRoleLabel = (roleName: string) => {
-    const role = roles.find(r => r.name === roleName);
+    const role = roles.find(r => r.name === roleName || r.id === roleName);
     return role?.label || roleName;
   };
 
@@ -156,7 +152,7 @@ export default function UsuariosPage() {
 
               <div className="user-card-body">
                 <div className="user-meta">
-                  <span className="role-tag">{getRoleLabel(user.role)}</span>
+                  <span className="role-tag">{user.role}</span>
                   <span className="user-date">
                     Criado: {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                   </span>
@@ -246,7 +242,7 @@ export default function UsuariosPage() {
                   onChange={e => setNewUser({ ...newUser, role: e.target.value })}
                 >
                   {roles.map(r => (
-                    <option key={r.id} value={r.name}>{r.label}</option>
+                    <option key={r.id} value={r.id}>{r.label}</option>
                   ))}
                 </select>
               </div>
@@ -302,7 +298,7 @@ export default function UsuariosPage() {
                   onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                 >
                   {roles.map(r => (
-                    <option key={r.id} value={r.name}>{r.label}</option>
+                    <option key={r.id} value={r.id}>{r.label}</option>
                   ))}
                 </select>
               </div>
