@@ -804,28 +804,27 @@
   border-radius: 6px;
 }
 
-.historico-lista {
+.historico-fila-horizontal {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 12px 4px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
-.historico-lista .venda-card {
-  min-width: unset;
-  max-width: unset;
-  width: 100%;
-  flex-shrink: unset;
+.historico-fila-horizontal::-webkit-scrollbar {
+  height: 6px;
 }
 
-.historico-lista .venda-card-content {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
+.historico-fila-horizontal::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
 }
 
-.historico-lista .venda-card-expanded {
-  min-width: unset;
-  max-width: unset;
+.historico-fila-horizontal::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
 }
 
 .venda-vendedor-tag {

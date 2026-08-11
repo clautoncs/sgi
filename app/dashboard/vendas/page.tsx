@@ -452,7 +452,7 @@ export default function VendasDashboard() {
             </div>
           </div>
 
-          {/* Histórico de Vendas do Dia Selecionado */}
+          {/* Histórico de Vendas do Dia Selecionado — Fila Horizontal */}
           <div className="historico-vendas-container">
             <div className="historico-header">
               <h3>Vendas em {diaSelecionado}</h3>
@@ -460,7 +460,7 @@ export default function VendasDashboard() {
                 Total: {formatCurrency(dados?.ultimasVendas?.filter(v => v.data === diaSelecionado).reduce((acc, v) => acc + v.valor, 0) || 0)}
               </span>
             </div>
-            <div className="historico-lista">
+            <div className="historico-fila-horizontal">
               <AnimatePresence>
                 {(() => {
                   const vendasDoDia = dados?.ultimasVendas?.filter(v => v.data === diaSelecionado) || [];
@@ -471,10 +471,10 @@ export default function VendasDashboard() {
                     <motion.div
                       key={`${venda.data}-${venda.produto}-${idx}`}
                       className={`venda-card ${vendaSelecionada === idx ? 'venda-card-expanded' : ''}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, x: -50, scale: 0.8 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
                       transition={{ delay: idx * 0.05, duration: 0.3 }}
-                      whileHover={{ scale: 1.03, zIndex: 10 }}
+                      whileHover={{ scale: 1.1, zIndex: 10 }}
                       onClick={() => setVendaSelecionada(vendaSelecionada === idx ? null : idx)}
                       layout
                     >
