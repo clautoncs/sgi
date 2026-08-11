@@ -115,6 +115,10 @@ export default function VendasDashboard() {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [vendaSelecionada, setVendaSelecionada] = useState<number | null>(null);
+  const [diaSelecionado, setDiaSelecionado] = useState<string>(() => {
+    const now = new Date();
+    return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const fetchDados = useCallback(async (silent = false) => {
     try {
@@ -376,7 +380,7 @@ export default function VendasDashboard() {
         ))}
       </div>
 
-      {/* Vendas do Dia */}
+      {/* Calendário + Histórico de Vendas */}
       <motion.div
         className="vendas-section"
         variants={sectionVariants}
@@ -384,60 +388,124 @@ export default function VendasDashboard() {
         animate="visible"
       >
         <div className="section-header">
-          <h2>Vendas do Dia</h2>
+          <h2>Vendas Diárias</h2>
           <span className="badge badge-green">
-            {(() => {
-              const hoje = new Date();
-              const diaHoje = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}`;
-              return dados?.ultimasVendas?.filter(v => v.data === diaHoje).length || 0;
-            })()} negociações hoje
+            {dados?.ultimasVendas?.filter(v => v.data === diaSelecionado).length || 0} vendas em {diaSelecionado}
           </span>
         </div>
-        <div className="ultimas-vendas-container">
-          <AnimatePresence>
-            {(() => {
-              const hoje = new Date();
-              const diaHoje = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}`;
-              const vendasDoDia = dados?.ultimasVendas?.filter(v => v.data === diaHoje) || [];
-              if (vendasDoDia.length === 0) {
-                return <p className="no-data">Nenhuma venda registrada hoje</p>;
-              }
-              return vendasDoDia.map((venda, idx) => (
-                <motion.div
-                  key={`${venda.data}-${venda.produto}-${idx}`}
-                  className={`venda-card ${vendaSelecionada === idx ? 'venda-card-expanded' : ''}`}
-                  initial={{ opacity: 0, x: -50, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  transition={{ delay: idx * 0.05, duration: 0.3 }}
-                  whileHover={{ scale: 1.1, zIndex: 10 }}
-                  onClick={() => setVendaSelecionada(vendaSelecionada === idx ? null : idx)}
-                  layout
-                >
-                  <span className="venda-data-hora">{venda.data} • {venda.hora || 'Hoje'}</span>
-                  <div className="venda-card-content">
-                    <span className="venda-produto">{venda.produto || 'Produto'}</span>
-                    <span className="venda-valor">{formatCurrency(venda.valor)}</span>
-                  </div>
-                  {vendaSelecionada === idx && (
-                    <motion.div
-                      className="venda-detalhes"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
+        <div className="calendario-historico-layout">
+          {/* Calendário do Mês */}
+          <div className="calendario-container">
+            <div className="calendario-header">
+              <span className="calendario-mes">
+                {new Date(parseInt(mesSelecionado.split('-')[0]), parseInt(mesSelecionado.split('-')[1]) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </span>
+            </div>
+            <div className="calendario-weekdays">
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
+                <span key={i} className="weekday">{d}</span>
+              ))}
+            </div>
+            <div className="calendario-grid">
+              {(() => {
+                const [ano, mes] = mesSelecionado.split('-').map(Number);
+                const primeiroDia = new Date(ano, mes - 1, 1).getDay();
+                const diasNoMes = new Date(ano, mes, 0).getDate();
+                const hoje = new Date();
+                const diaHoje = hoje.getDate();
+                const mesHoje = hoje.getMonth() + 1;
+                const anoHoje = hoje.getFullYear();
+                const cells = [];
+                
+                // Espaços vazios antes do dia 1
+                for (let i = 0; i < primeiroDia; i++) {
+                  cells.push(<span key={`empty-${i}`} className="dia-cell empty"></span>);
+                }
+                
+                // Dias do mês
+                for (let dia = 1; dia <= diasNoMes; dia++) {
+                  const diaStr = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`;
+                  const vendasDia = dados?.ultimasVendas?.filter(v => v.data === diaStr) || [];
+                  const temVenda = vendasDia.length > 0;
+                  const totalDia = vendasDia.reduce((acc, v) => acc + v.valor, 0);
+                  const isHoje = dia === diaHoje && mes === mesHoje && ano === anoHoje;
+                  const isSelecionado = diaStr === diaSelecionado;
+                  
+                  cells.push(
+                    <span
+                      key={dia}
+                      className={`dia-cell ${temVenda ? 'com-venda' : ''} ${isHoje ? 'hoje' : ''} ${isSelecionado ? 'selecionado' : ''}`}
+                      onClick={() => setDiaSelecionado(diaStr)}
+                      title={temVenda ? `${vendasDia.length} vendas - ${formatCurrency(totalDia)}` : 'Sem vendas'}
                     >
-                      <div className="detalhe-row"><span>Vendedor:</span><span>{venda.vendedor}</span></div>
-                      <div className="detalhe-row"><span>Cliente:</span><span>{venda.cliente || '—'}</span></div>
-                      <div className="detalhe-row"><span>Origem:</span><span>{venda.origem || '—'}</span></div>
-                      <div className="detalhe-row"><span>Pagamento:</span><span>{venda.pagamento || '—'}</span></div>
-                      <div className="detalhe-row"><span>Custo:</span><span>{formatCurrency(venda.custo)}</span></div>
-                      <div className="detalhe-row lucro"><span>Lucro:</span><span>{formatCurrency(venda.valor - venda.custo)}</span></div>
+                      {dia}
+                      {temVenda && <span className="venda-dot">{vendasDia.length}</span>}
+                    </span>
+                  );
+                }
+                return cells;
+              })()}
+            </div>
+            <div className="calendario-legenda">
+              <span><span className="dot dot-venda"></span> Com vendas</span>
+              <span><span className="dot dot-hoje"></span> Hoje</span>
+            </div>
+          </div>
+
+          {/* Histórico de Vendas do Dia Selecionado */}
+          <div className="historico-vendas-container">
+            <div className="historico-header">
+              <h3>Vendas em {diaSelecionado}</h3>
+              <span className="historico-total">
+                Total: {formatCurrency(dados?.ultimasVendas?.filter(v => v.data === diaSelecionado).reduce((acc, v) => acc + v.valor, 0) || 0)}
+              </span>
+            </div>
+            <div className="historico-lista">
+              <AnimatePresence>
+                {(() => {
+                  const vendasDoDia = dados?.ultimasVendas?.filter(v => v.data === diaSelecionado) || [];
+                  if (vendasDoDia.length === 0) {
+                    return <p className="no-data">Nenhuma venda neste dia</p>;
+                  }
+                  return vendasDoDia.map((venda, idx) => (
+                    <motion.div
+                      key={`${venda.data}-${venda.produto}-${idx}`}
+                      className={`venda-card ${vendaSelecionada === idx ? 'venda-card-expanded' : ''}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05, duration: 0.3 }}
+                      whileHover={{ scale: 1.03, zIndex: 10 }}
+                      onClick={() => setVendaSelecionada(vendaSelecionada === idx ? null : idx)}
+                      layout
+                    >
+                      <span className="venda-data-hora">{venda.hora || venda.data}</span>
+                      <div className="venda-card-content">
+                        <span className="venda-produto">{venda.produto || 'Produto'}</span>
+                        <span className="venda-valor">{formatCurrency(venda.valor)}</span>
+                      </div>
+                      <span className="venda-vendedor-tag">{venda.vendedor}</span>
+                      {vendaSelecionada === idx && (
+                        <motion.div
+                          className="venda-detalhes"
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                        >
+                          <div className="detalhe-row"><span>Vendedor:</span><span>{venda.vendedor}</span></div>
+                          <div className="detalhe-row"><span>Cliente:</span><span>{venda.cliente || '—'}</span></div>
+                          <div className="detalhe-row"><span>Origem:</span><span>{venda.origem || '—'}</span></div>
+                          <div className="detalhe-row"><span>Pagamento:</span><span>{venda.pagamento || '—'}</span></div>
+                          <div className="detalhe-row"><span>Custo:</span><span>{formatCurrency(venda.custo)}</span></div>
+                          <div className="detalhe-row lucro"><span>Lucro:</span><span>{formatCurrency(venda.valor - venda.custo)}</span></div>
+                        </motion.div>
+                      )}
                     </motion.div>
-                  )}
-                </motion.div>
-              ));
-            })()}
-          </AnimatePresence>
+                  ));
+                })()}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
       </motion.div>
 

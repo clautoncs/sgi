@@ -598,3 +598,255 @@
   color: #10b981;
   font-weight: 600;
 }
+
+/* ============================================================
+   Calendário + Histórico — Layout duas colunas
+   ============================================================ */
+
+.calendario-historico-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  min-height: 320px;
+}
+
+/* Calendário */
+.calendario-container {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.calendario-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.calendario-mes {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-transform: capitalize;
+}
+
+.calendario-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  padding: 4px 0;
+}
+
+.calendario-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.dia-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+}
+
+.dia-cell.empty {
+  cursor: default;
+}
+
+.dia-cell:not(.empty):hover {
+  background: #334155;
+  color: #e2e8f0;
+  transform: scale(1.1);
+}
+
+.dia-cell.com-venda {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-weight: 700;
+}
+
+.dia-cell.com-venda:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.dia-cell.hoje {
+  border: 2px solid #3b82f6;
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.dia-cell.hoje.com-venda {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.dia-cell.selecionado {
+  background: #3b82f6 !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  transform: scale(1.1);
+}
+
+.venda-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 0.5rem;
+  background: #10b981;
+  color: #fff;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.calendario-legenda {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #334155;
+  justify-content: center;
+}
+
+.calendario-legenda span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-venda {
+  background: #10b981;
+}
+
+.dot-hoje {
+  background: transparent;
+  border: 2px solid #3b82f6;
+}
+
+/* Histórico de Vendas */
+.historico-vendas-container {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 380px;
+}
+
+.historico-vendas-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.historico-vendas-container::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 3px;
+}
+
+.historico-vendas-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.historico-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #334155;
+}
+
+.historico-header h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.historico-total {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.historico-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historico-lista .venda-card {
+  min-width: unset;
+  max-width: unset;
+  width: 100%;
+  flex-shrink: unset;
+}
+
+.historico-lista .venda-card-content {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.historico-lista .venda-card-expanded {
+  min-width: unset;
+  max-width: unset;
+}
+
+.venda-vendedor-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .calendario-historico-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .calendario-container {
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
