@@ -1,263 +1,139 @@
-# SGI — Sistema de Gerenciamento iLinked
+# SGI - Sistema de Gerenciamento iLinked
 
-> Plataforma de dashboards com autenticação, permissionamento e integrações configuráveis.
+Sistema de dashboards e gerenciamento para a **PCBH Informática** (R. Malaga, 53, Contagem/MG).
 
-**PCBH Informática** · R. Malaga, 53 — Santa Cruz Industrial, Contagem/MG
+## Acesso
 
----
-
-## Visão Geral
-
-O SGI é uma aplicação web de dashboards desenvolvida para centralizar dados de múltiplas fontes (Google Ads, Meta Ads, planilhas, APIs) em painéis customizáveis. O sistema conta com autenticação local e SSO Google, controle de acesso baseado em roles (RBAC) e auditoria de ações.
-
----
+- **URL:** https://sgi.ilinked.com.br
+- **Login:** admin@ilinked.com.br / admin123
+- **SSO Google:** Habilitado (usuários aprovados pelo admin)
 
 ## Stack Tecnológica
 
-| Camada | Tecnologia |
-|---|---|
-| Frontend | Next.js 16 (React 19, TypeScript) |
-| Backend | Next.js API Routes (App Router) |
-| ORM | Prisma 6 |
-| Banco de Dados | TiDB Cloud (MySQL compatível) |
-| Autenticação | NextAuth.js v4 (Credentials + Google OAuth) |
-| Container | Docker (multi-stage build) |
-| Proxy Reverso | Nginx 1.24 + Let's Encrypt (HTTPS) |
-| CI/CD | GitHub Actions |
-| VPS | Ubuntu 24.04 LTS |
+| Tecnologia | Versão | Uso |
+|---|---|---|
+| Next.js | 16.2.9 | Framework (App Router, TypeScript) |
+| Prisma | 6.19.3 | ORM |
+| TiDB Cloud | MySQL | Banco de dados (autenticação/usuários) |
+| NextAuth.js | v4 | Autenticação (Credentials + Google SSO) |
+| Recharts | - | Gráficos interativos |
+| Framer Motion | - | Animações |
+| Google Sheets API | - | Dados de vendas e estoque (tempo real) |
+| Docker | 29.6.1 | Containerização |
+| Nginx | 1.24 | Reverse proxy + SSL |
+| Let's Encrypt | - | Certificado SSL |
 
----
+## Estrutura de Rotas
 
-## Estrutura do Projeto
+| Rota | Descrição | Proteção |
+|---|---|---|
+| `/` | Página de login | Pública |
+| `/status` | Status do sistema | Pública |
+| `/dashboard` | Painel de controle | Autenticado |
+| `/dashboard/vendas` | Dashboard de vendas | Autenticado |
+| `/estoque` | Catálogo de estoque | Autenticado |
+| `/estoque/pedidos` | Listagem de pedidos | Autenticado |
+| `/estoque/pedido?id=X` | Pedido individual | Autenticado |
+| `/estoque/proposta` | Geração de proposta PDF | Autenticado |
+| `/configuracoes/metas` | Configuração de metas | Autenticado |
+| `/configuracoes/usuarios` | Gerenciamento de usuários | Autenticado |
+| `/configuracoes/permissoes` | Perfis e permissões | Autenticado |
+| `/configuracoes/integracoes` | Fontes de dados | Autenticado |
 
-```
-sgi/
-  app/                        # Páginas e rotas (App Router)
-    api/                      # API Routes
-      health/db/route.ts      # Health check do banco
-    globals.css               # Estilos globais
-    layout.tsx                # Layout raiz
-    page.tsx                  # Página inicial
-  lib/                        # Utilitários compartilhados
-    prisma.ts                 # Singleton do Prisma Client
-  prisma/
-    schema.prisma             # Schema do banco de dados
-    seed.ts                   # Dados iniciais (roles, admin)
-  nginx/
-    sgi.conf                  # Configuração Nginx
-  .github/
-    workflows/
-      deploy.yml              # CI/CD - Deploy automático
-  docker-compose.yml          # Orquestração do container
-  Dockerfile                  # Build multi-stage
-  deploy.sh                   # Script de deploy manual
-  db.sh                       # Gerenciamento do banco (Prisma)
-  .env                        # Variáveis de ambiente (NAO versionado)
-  .env.example                # Exemplo de variáveis
-  .gitignore                  # Arquivos ignorados pelo Git
-  next.config.js              # Configuração Next.js
-  tsconfig.json               # Configuração TypeScript
-  package.json                # Dependências e scripts
-```
+## APIs
 
----
+| Endpoint | Método | Descrição |
+|---|---|---|
+| `/api/sheets` | GET | Dados de vendas (Google Sheets) |
+| `/api/metas` | GET/POST | CRUD de metas mensais |
+| `/api/estoque` | GET | Dados de estoque (Google Sheets) |
+| `/api/pedidos` | GET/POST/PUT/DELETE | CRUD de pedidos |
+| `/api/usuarios` | GET/POST/PUT/DELETE | CRUD de usuários |
+| `/api/permissoes` | GET/POST/PUT/DELETE | CRUD de perfis/permissões |
+| `/api/health` | GET | Health check |
 
-## Pré-requisitos
+## Fontes de Dados (Google Sheets)
 
-- Docker >= 24.0
-- Docker Compose >= 2.0
-- Git >= 2.40
-- Domínio apontando para o IP do VPS (DNS A record)
+### Planilha de Vendas
+- **ID:** 1lB-W_5t0H3dWLBKZdKxJ00mKSktkaXidrv1k_rTWYN4
+- **Abas:** AGOSTO-26, JULHO-26, JUNHO-26, etc.
+- **Colunas:** DATA, VENDEDOR, ORIGEM, ANÚNCIO, BASE, PRODUTO, VALOR, FRETE, PAGAMENTO, NOME, TELEFONE, SISTEMA, CUSTO, TOTAL DIA
+- **Vendedores:** FLÁVIA, YASMIN, CLAUTON
 
----
+### Planilha de Estoque
+- **ID:** 1o-AtrxDoSzDjOwNt_UIsbe5vtFrgSDLywd1a7nxI22U
+- **Abas:** COMPUTADORES, NOTEBOOKS, COMPONENTES, MONITORES
+- **Service Account:** shetts@golden-shine-142418.iam.gserviceaccount.com
 
-## Instalação
+## Funcionalidades
 
-### 1. Clonar o repositório
+### Dashboard de Vendas
+- Cards: Total Vendas Dia, Total Vendas, Meta do Mês, Meta Faltante, Ticket Médio, Lucro Total
+- Gráfico evolução diária vs meta (Recharts) com tooltip interativo
+- Calendário mensal com histórico de vendas por dia
+- Fila horizontal de vendas do dia selecionado
+- Tabela de performance por vendedor
+- Auto-refresh a cada 2 minutos
+- Seletor de mês
+
+### Catálogo de Estoque
+- 4 categorias: Computadores, Notebooks, Componentes, Monitores
+- 3 perfis de visualização: Prateleira, Revenda, Vendedor
+- Busca em tempo real
+- Links de fotos dos produtos (Google Photos)
+- Carrinho com desconto/alteração de preço
+- Sistema de pedidos com aprovação por gerente
+- Geração de proposta (WhatsApp e PDF)
+- Auto-refresh a cada 2 minutos
+
+### Gerenciamento de Usuários
+- Listagem com filtros (Ativos, Pendentes, Bloqueados)
+- Criação manual de usuários
+- Aprovação de login SSO Google
+- Edição de perfil de acesso
+
+### Permissões
+- Perfis: Administrador, Gerente, Vendedor, Visualizador
+- Permissões granulares por página (Visualizar, Editar, Gerenciar)
+- Criação de perfis customizados
+
+## Infraestrutura
+
+- **VPS:** 206.183.129.142 (Ubuntu 24.04 LTS)
+- **Container SGI:** porta 127.0.0.1:3000
+- **Container OpenClaw:** porta 0.0.0.0:18789 (https://claw.ilinked.com.br)
+- **Nginx:** Reverse proxy com SSL para ambos os domínios
+- **CI/CD:** GitHub Actions (deploy automático no push para main)
+
+## Deploy Manual
 
 ```bash
-git clone git@github.com:clautoncs/sgi.git /root/sgi-skeleton
+ssh root@206.183.129.142
 cd /root/sgi-skeleton
-```
-
-### 2. Configurar variáveis de ambiente
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-### 3. Criar tabelas no banco
-
-```bash
-./db.sh db push
-```
-
-### 4. Popular dados iniciais
-
-```bash
-docker run --rm --env-file .env -v "$PWD":/app -w /app node:22-slim \
-  sh -c 'apt-get update -qq && apt-get install -y -qq openssl ca-certificates >/dev/null 2>&1 && npm ci --no-audit --no-fund >/dev/null 2>&1 && npx tsx prisma/seed.ts'
-```
-
-### 5. Build e deploy
-
-```bash
 docker compose up -d --build
 ```
 
-### 6. Configurar Nginx + SSL
-
-```bash
-sudo cp nginx/sgi.conf /etc/nginx/sites-available/sgi.conf
-sudo ln -sf /etc/nginx/sites-available/sgi.conf /etc/nginx/sites-enabled/sgi.conf
-sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d sgi.ilinked.com.br
-```
-
----
-
-## Deploy
-
-### Deploy Manual
-
-```bash
-./deploy.sh
-```
-
-Este script executa: `git pull` -> `docker compose up -d --build` -> `docker image prune -f`
-
-### Deploy Automático (CI/CD)
-
-O deploy é acionado automaticamente a cada push na branch `main` via GitHub Actions. O workflow SSH conecta na VPS e executa o `deploy.sh`.
-
----
-
-## Gerenciamento do Banco
-
-```bash
-# Sincronizar schema com o banco (sem migrações)
-./db.sh db push
-
-# Criar uma migração formal
-./db.sh migrate dev --name descricao_da_mudanca
-
-# Resetar banco (CUIDADO: apaga tudo)
-./db.sh migrate reset
-
-# Abrir Prisma Studio (interface visual)
-./db.sh studio
-```
-
----
-
-## Versionamento
-
-O projeto segue **Semantic Versioning (SemVer)**:
+## Variáveis de Ambiente (.env)
 
 ```
-MAJOR.MINOR.PATCH
+DATABASE_URL=mysql://...
+NEXTAUTH_SECRET=...
+NEXTAUTH_URL=https://sgi.ilinked.com.br
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CREDENTIALS_PATH=/app/google-credentials.json
+GOOGLE_SHEET_ID=1lB-W_5t0H3dWLBKZdKxJ00mKSktkaXidrv1k_rTWYN4
+GOOGLE_SHEET_ESTOQUE_ID=1o-AtrxDoSzDjOwNt_UIsbe5vtFrgSDLywd1a7nxI22U
 ```
 
-| Tipo | Quando incrementar | Exemplo |
-|---|---|---|
-| MAJOR | Mudanças incompatíveis na API/estrutura | 1.0.0 -> 2.0.0 |
-| MINOR | Nova funcionalidade compatível | 1.0.0 -> 1.1.0 |
-| PATCH | Correção de bug | 1.0.0 -> 1.0.1 |
+## Segurança
 
-### Tags de Release
-
-```bash
-git tag -a v1.0.0 -m "Release 1.0.0: Autenticação e permissionamento"
-git push origin v1.0.0
-```
-
-### Branches
-
-| Branch | Propósito |
-|---|---|
-| `main` | Produção — deploy automático |
-| `develop` | Desenvolvimento — integração de features |
-| `feature/*` | Novas funcionalidades |
-| `hotfix/*` | Correções urgentes em produção |
-
----
-
-## Módulos do Sistema
-
-### Autenticação
-
-- Login local (email + senha com bcrypt)
-- SSO Google (OAuth 2.0 via NextAuth)
-- Sessões com expiração configurável
-- Registro de IP e user-agent
-
-### Permissionamento (RBAC)
-
-- Roles: Administrador, Gerente, Visualizador (customizáveis)
-- Permissões granulares por módulo
-- Vínculo role <-> permissão (N:N)
-
-### Fontes de Dados
-
-- Tipo: API, Database, Spreadsheet, Webhook
-- Providers: Google Ads, Meta Ads, Sheets, Custom
-- Configuração JSON criptografada
-- Sincronização com timestamp
-
-### Dashboards
-
-- Slug único para URLs amigáveis
-- Layout e widgets configuráveis via JSON
-- Vínculo com múltiplas fontes
-- Ordenação customizável
-
-### Configurações
-
-- Chave-valor com tipagem (string, number, boolean, json)
-- Agrupamento: general, appearance, auth, integrations
-- Interface de administração
-
-### Auditoria
-
-- Log de todas as ações (login, CRUD, config)
-- Rastreamento por usuário e IP
-- Detalhes em JSON
-
----
-
-## Variáveis de Ambiente
-
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `DATABASE_URL` | URL de conexão MySQL/TiDB | `mysql://user:pass@host:4000/sgi?sslaccept=strict` |
-| `NEXTAUTH_SECRET` | Chave secreta para JWT | (gerar com `openssl rand -base64 32`) |
-| `NEXTAUTH_URL` | URL base da aplicação | `https://sgi.ilinked.com.br` |
-| `GOOGLE_CLIENT_ID` | OAuth Google (opcional) | `xxx.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | Secret OAuth Google | `GOCSPX-xxx` |
-
----
-
-## Contribuição
-
-1. Crie uma branch a partir de `develop`: `git checkout -b feature/nome-da-feature`
-2. Desenvolva e teste localmente
-3. Commit com mensagem descritiva (padrão Conventional Commits)
-4. Abra um Pull Request para `develop`
-5. Após revisão, merge para `develop` -> depois para `main` (deploy)
-
-### Padrão de Commits
-
-```
-feat: adiciona login com Google SSO
-fix: corrige validação de email no cadastro
-docs: atualiza README com instruções de deploy
-refactor: reorganiza middleware de autenticação
-chore: atualiza dependências do Prisma
-```
-
----
+- Chaves de autenticação armazenadas APENAS no .env da VPS
+- Credenciais Google (JSON) montadas como volume Docker (fora do repositório)
+- Metas e pedidos em arquivos JSON persistentes (volumes Docker)
+- Middleware NextAuth protege todas as rotas internas
+- SSL/HTTPS obrigatório
 
 ## Licença
 
-Projeto privado — PCBH Informática / iLinked. Todos os direitos reservados.
+Proprietário - PCBH Informática / iLinked

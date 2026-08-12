@@ -178,7 +178,7 @@ export default function DashboardPage() {
           <span className="widget-panel__title">Ações Rápidas</span>
         </div>
         <div className="quick-actions">
-          <a href="/dashboard/integrations" className="quick-action">
+          <a href="/configuracoes/integracoes" className="quick-action">
             <div className="quick-action__icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
               <div className="quick-action__desc">Conectar fonte de dados</div>
             </div>
           </a>
-          <a href="/dashboard/admin/users" className="quick-action">
+          <a href="/configuracoes/usuarios" className="quick-action">
             <div className="quick-action__icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -204,7 +204,7 @@ export default function DashboardPage() {
               <div className="quick-action__desc">Gerenciar equipe</div>
             </div>
           </a>
-          <a href="/dashboard/admin/settings" className="quick-action">
+          <a href="/configuracoes/metas" className="quick-action">
             <div className="quick-action__icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3"/>

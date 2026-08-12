@@ -1,28 +1,25 @@
 import { withAuth } from "next-auth/middleware";
-
 export default withAuth({
   pages: {
     signIn: "/",
   },
 });
-
 export const config = {
   matcher: [
     /*
-     * Protege apenas as rotas internas do sistema:
-     * - /dashboard e sub-rotas
-     * - /admin e sub-rotas
-     * - /settings e sub-rotas
+     * Protege as rotas internas do sistema:
+     * - /dashboard e sub-rotas (vendas)
+     * - /estoque e sub-rotas (catálogo, pedidos, proposta)
+     * - /configuracoes e sub-rotas (metas, usuarios, permissoes, integracoes)
      *
      * Rotas públicas (NÃO protegidas):
      * - / (login)
      * - /status
-     * - /api/auth (NextAuth)
-     * - /api/health (health check)
+     * - /api (todas as APIs)
      * - /_next (assets)
      */
     "/dashboard/:path*",
-    "/admin/:path*",
-    "/settings/:path*",
+    "/estoque/:path*",
+    "/configuracoes/:path*",
   ],
 };

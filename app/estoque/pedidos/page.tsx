@@ -159,7 +159,7 @@ export default function PedidosPage() {
             <div key={pedido.id} className={`pedido-card ${pedido.status === 'pendente_aprovacao' ? 'destaque' : ''}`}>
               <div className="pedido-card-header">
                 <div className="pedido-card-id">
-                  <a href={`/dashboard/estoque/pedido?id=${pedido.id}`}>{pedido.id}</a>
+                  <a href={`/estoque/pedido?id=${pedido.id}`}>{pedido.id}</a>
                   {getStatusBadge(pedido.status)}
                 </div>
                 <span className="pedido-card-data">{formatDate(pedido.criadoEm)}</span>
@@ -190,7 +190,7 @@ export default function PedidosPage() {
 
               {/* Ações */}
               <div className="pedido-card-acoes">
-                <a href={`/dashboard/estoque/pedido?id=${pedido.id}`} className="btn-ver">Ver</a>
+                <a href={`/estoque/pedido?id=${pedido.id}`} className="btn-ver">Ver</a>
                 
                 {pedido.status === 'pendente_aprovacao' && (
                   <>

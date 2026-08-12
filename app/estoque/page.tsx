@@ -221,7 +221,7 @@ export default function EstoquePage() {
       perfil,
     };
     const params = encodeURIComponent(JSON.stringify(dados));
-    window.open(`/dashboard/estoque/proposta?dados=${params}`, '_blank');
+    window.open(`/estoque/proposta?dados=${params}`, '_blank');
   }
 
   async function gerarPedido(enviarAprovacao: boolean) {
@@ -271,7 +271,7 @@ export default function EstoquePage() {
 
   function copiarLinkPedido() {
     if (pedidoCriado) {
-      const link = `${window.location.origin}/dashboard/estoque/pedido?id=${pedidoCriado}`;
+      const link = `${window.location.origin}/estoque/pedido?id=${pedidoCriado}`;
       navigator.clipboard.writeText(link);
       alert('Link copiado!');
     }
@@ -312,7 +312,7 @@ export default function EstoquePage() {
             <button className={`perfil-btn ${perfil === 'revenda' ? 'active' : ''}`} onClick={() => setPerfil('revenda')}>Revenda</button>
             <button className={`perfil-btn ${perfil === 'vendedor' ? 'active' : ''}`} onClick={() => setPerfil('vendedor')}>Vendedor</button>
           </div>
-          <a href="/dashboard/estoque/pedidos" className="btn-pedidos-link">📋 Pedidos</a>
+          <a href="/estoque/pedidos" className="btn-pedidos-link">📋 Pedidos</a>
           <button className="carrinho-btn" onClick={() => setCarrinhoAberto(!carrinhoAberto)}>
             🛒 <span className="carrinho-badge">{carrinho.length}</span>
           </button>
@@ -458,13 +458,13 @@ export default function EstoquePage() {
                   <input 
                     type="text" 
                     readOnly 
-                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/estoque/pedido?id=${pedidoCriado}`}
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/estoque/pedido?id=${pedidoCriado}`}
                     className="pedido-link-input"
                   />
                   <button className="btn-copiar-link" onClick={copiarLinkPedido}>📋 Copiar Link</button>
                 </div>
                 <div className="pedido-sucesso-acoes">
-                  <a href={`/dashboard/estoque/pedido?id=${pedidoCriado}`} className="btn-ver-pedido">Ver Pedido</a>
+                  <a href={`/estoque/pedido?id=${pedidoCriado}`} className="btn-ver-pedido">Ver Pedido</a>
                   <button className="btn-novo-pedido" onClick={novoPedido}>+ Novo Pedido</button>
                 </div>
               </div>
