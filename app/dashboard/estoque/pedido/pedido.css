@@ -1,0 +1,275 @@
+.pedido-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: #e2e8f0;
+}
+
+.pedido-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pedido-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pedido-header-left h1 {
+  font-size: 1.5rem;
+  color: #f1f5f9;
+  margin: 0;
+}
+
+.pedido-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.pedido-data {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-rascunho { background: #334155; color: #94a3b8; }
+.status-pendente { background: #92400e33; color: #fbbf24; border: 1px solid #92400e; }
+.status-aprovado { background: #16653433; color: #4ade80; border: 1px solid #166534; }
+.status-rejeitado { background: #7f1d1d33; color: #f87171; border: 1px solid #7f1d1d; }
+.status-finalizado { background: #1e3a5f33; color: #60a5fa; border: 1px solid #1e3a5f; }
+
+.pedido-cliente-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #334155;
+}
+
+.pedido-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pedido-campo label {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.pedido-campo span {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+}
+
+.pedido-campo input {
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+}
+
+.perfil-tag {
+  background: #1e40af33;
+  color: #60a5fa;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.pedido-obs {
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  border: 1px solid #334155;
+}
+
+.pedido-obs label {
+  font-size: 0.72rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.pedido-obs p {
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.pedido-obs textarea {
+  width: 100%;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.pedido-itens {
+  margin-bottom: 20px;
+}
+
+.pedido-itens h2 {
+  font-size: 1rem;
+  color: #f1f5f9;
+  margin: 0 0 12px;
+}
+
+.pedido-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  background: #1e293b;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.pedido-tabela th {
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 10px 12px;
+  font-size: 0.72rem;
+  text-align: left;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.pedido-tabela td {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #334155;
+  color: #cbd5e1;
+}
+
+.pedido-tabela td strong {
+  color: #f1f5f9;
+}
+
+.pedido-tabela td small {
+  color: #64748b;
+}
+
+.pedido-tabela tfoot td {
+  background: #0f172a;
+  border-top: 2px solid #1e40af;
+}
+
+.total-valor {
+  color: #4ade80;
+  font-size: 1rem;
+}
+
+.cat-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.cat-computador { background: #1e40af33; color: #60a5fa; }
+.cat-notebook { background: #7c3aed33; color: #a78bfa; }
+.cat-monitor { background: #0d948833; color: #2dd4bf; }
+.cat-componente { background: #92400e33; color: #fbbf24; }
+
+.input-qtd, .input-desc, .input-valor {
+  width: 70px;
+  background: #0f172a;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.input-valor { width: 90px; }
+
+.pedido-aprovacao-info {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+}
+
+.pedido-aprovacao-info.aprovado {
+  background: #16653433;
+  border: 1px solid #166534;
+  color: #4ade80;
+}
+
+.pedido-aprovacao-info.rejeitado {
+  background: #7f1d1d33;
+  border: 1px solid #7f1d1d;
+  color: #f87171;
+}
+
+.pedido-aprovacao-info p {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #fca5a5;
+}
+
+.pedido-acoes {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pedido-acoes button, .pedido-acoes a {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-editar { background: #334155; color: #e2e8f0; }
+.btn-editar:hover { background: #475569; }
+.btn-enviar { background: #92400e; color: #fbbf24; }
+.btn-enviar:hover { background: #a16207; }
+.btn-salvar { background: #166534; color: #4ade80; }
+.btn-salvar:hover { background: #15803d; }
+.btn-cancelar { background: #334155; color: #94a3b8; }
+.btn-whatsapp-pedido { background: #166534; color: #4ade80; }
+.btn-copiar { background: #1e3a5f; color: #60a5fa; }
+.btn-copiar:hover { background: #1e40af; }
+
+.pedido-loading, .pedido-erro {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  color: #94a3b8;
+  font-size: 1rem;
+}

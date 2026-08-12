@@ -12,7 +12,6 @@ interface Produto {
   custo: number;
   foto: string;
   status: string;
-  // Computador
   modelo?: string;
   modalidade?: string;
   chassi?: string;
@@ -20,22 +19,21 @@ interface Produto {
   memoria?: string;
   ssd?: string;
   video?: string;
-  // Notebook
   tamanho?: string;
   resolucao?: string;
-  // Monitor
   estado?: string;
   tecnologia?: string;
   frequencia?: string;
   interface_?: string;
   pe?: string;
-  // Componente
   produto?: string;
 }
 
 interface ItemCarrinho {
   produto: Produto;
   quantidade: number;
+  valorCustom: number | null; // null = preço original
+  desconto: number; // percentual
 }
 
 type Perfil = 'prateleira' | 'revenda' | 'vendedor';
@@ -49,6 +47,12 @@ export default function EstoquePage() {
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
   const [carrinhoAberto, setCarrinhoAberto] = useState(false);
   const [produtoExpandido, setProdutoExpandido] = useState<string | null>(null);
+  const [clienteNome, setClienteNome] = useState('');
+  const [clienteTelefone, setClienteTelefone] = useState('');
+  const [observacoes, setObservacoes] = useState('');
+  const [gerando, setGerando] = useState(false);
+  const [pedidoCriado, setPedidoCriado] = useState<string | null>(null);
+  const [editandoPreco, setEditandoPreco] = useState<string | null>(null);
 
   useEffect(() => {
     fetchEstoque();
@@ -69,11 +73,9 @@ export default function EstoquePage() {
 
   const produtosFiltrados = useMemo(() => {
     let filtered = produtos;
-    
     if (categoriaAtiva !== 'TODOS') {
       filtered = filtered.filter(p => p.categoria === categoriaAtiva);
     }
-    
     if (busca.trim()) {
       const termo = busca.toLowerCase();
       filtered = filtered.filter(p => {
@@ -84,7 +86,6 @@ export default function EstoquePage() {
         return nome.includes(termo) || proc.includes(termo) || mem.includes(termo) || ssd.includes(termo);
       });
     }
-    
     return filtered;
   }, [produtos, categoriaAtiva, busca]);
 
@@ -111,6 +112,13 @@ export default function EstoquePage() {
     return p.valor;
   }
 
+  function getPrecoItem(item: ItemCarrinho): number {
+    if (item.valorCustom !== null) return item.valorCustom;
+    const base = getPreco(item.produto);
+    if (item.desconto > 0) return base * (1 - item.desconto / 100);
+    return base;
+  }
+
   function formatCurrency(val: number): string {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
@@ -125,7 +133,7 @@ export default function EstoquePage() {
             : item
         );
       }
-      return [...prev, { produto: p, quantidade: 1 }];
+      return [...prev, { produto: p, quantidade: 1, valorCustom: null, desconto: 0 }];
     });
   }
 
@@ -134,36 +142,54 @@ export default function EstoquePage() {
   }
 
   function alterarQuantidadeCarrinho(id: string, qtd: number) {
-    if (qtd <= 0) {
-      removerDoCarrinho(id);
-      return;
-    }
+    if (qtd <= 0) { removerDoCarrinho(id); return; }
     setCarrinho(prev => prev.map(item => 
       item.produto.id === id ? { ...item, quantidade: qtd } : item
     ));
   }
 
+  function aplicarDesconto(id: string, desconto: number) {
+    setCarrinho(prev => prev.map(item => 
+      item.produto.id === id ? { ...item, desconto: Math.max(0, Math.min(100, desconto)), valorCustom: null } : item
+    ));
+  }
+
+  function alterarPrecoFinal(id: string, valor: number) {
+    setCarrinho(prev => prev.map(item => 
+      item.produto.id === id ? { ...item, valorCustom: valor, desconto: 0 } : item
+    ));
+  }
+
   function totalCarrinho(): number {
+    return carrinho.reduce((acc, item) => acc + (getPrecoItem(item) * item.quantidade), 0);
+  }
+
+  function subtotalOriginal(): number {
     return carrinho.reduce((acc, item) => acc + (getPreco(item.produto) * item.quantidade), 0);
   }
 
   function gerarTextoWhatsApp(): string {
     let texto = `*PROPOSTA COMERCIAL - PCBH Informática*\n`;
     texto += `R. Malaga, 53 - Contagem/MG\n`;
-    texto += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    texto += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (clienteNome) texto += `*Cliente:* ${clienteNome}\n`;
+    if (clienteTelefone) texto += `*Telefone:* ${clienteTelefone}\n`;
+    texto += `\n`;
     
     carrinho.forEach((item, idx) => {
       const nome = getNomeProduto(item.produto);
       const desc = getDescricaoProduto(item.produto);
-      const preco = getPreco(item.produto);
+      const preco = getPrecoItem(item);
       texto += `*${idx + 1}. ${nome}*\n`;
       if (desc) texto += `   ${desc}\n`;
-      texto += `   Qtd: ${item.quantidade} | Valor unit.: ${formatCurrency(preco)}\n`;
+      texto += `   Qtd: ${item.quantidade} | Valor: ${formatCurrency(preco)}\n`;
+      if (item.desconto > 0) texto += `   _Desconto: ${item.desconto}%_\n`;
       texto += `   *Subtotal: ${formatCurrency(preco * item.quantidade)}*\n\n`;
     });
     
     texto += `━━━━━━━━━━━━━━━━━━━━━━\n`;
     texto += `*TOTAL: ${formatCurrency(totalCarrinho())}*\n\n`;
+    if (observacoes) texto += `_Obs: ${observacoes}_\n`;
     texto += `_Proposta válida por 3 dias úteis._\n`;
     texto += `_Sujeito à disponibilidade de estoque._`;
     
@@ -172,27 +198,85 @@ export default function EstoquePage() {
 
   function enviarWhatsApp() {
     const texto = gerarTextoWhatsApp();
-    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    const url = `https://wa.me/${clienteTelefone ? clienteTelefone.replace(/\D/g, '') : ''}?text=${encodeURIComponent(texto)}`;
     window.open(url, '_blank');
   }
 
   function gerarPDF() {
-    // Gera um PDF via API
     const dados = {
       itens: carrinho.map(item => ({
         nome: getNomeProduto(item.produto),
         descricao: getDescricaoProduto(item.produto),
         quantidade: item.quantidade,
-        valorUnit: getPreco(item.produto),
-        subtotal: getPreco(item.produto) * item.quantidade,
+        valorUnit: getPrecoItem(item),
+        subtotal: getPrecoItem(item) * item.quantidade,
       })),
       total: totalCarrinho(),
       perfil,
     };
-    
-    // Abre em nova aba com os dados para gerar PDF
     const params = encodeURIComponent(JSON.stringify(dados));
     window.open(`/dashboard/estoque/proposta?dados=${params}`, '_blank');
+  }
+
+  async function gerarPedido(enviarAprovacao: boolean) {
+    setGerando(true);
+    try {
+      const body = {
+        criadoPor: 'Vendedor',
+        criadoPorEmail: '',
+        cliente: clienteNome,
+        telefone: clienteTelefone,
+        observacoes,
+        perfil,
+        enviarAprovacao,
+        subtotal: subtotalOriginal(),
+        descontoGeral: subtotalOriginal() > 0 ? ((1 - totalCarrinho() / subtotalOriginal()) * 100) : 0,
+        total: totalCarrinho(),
+        itens: carrinho.map(item => ({
+          produtoId: item.produto.id,
+          nome: getNomeProduto(item.produto),
+          descricao: getDescricaoProduto(item.produto),
+          categoria: item.produto.categoria,
+          quantidade: item.quantidade,
+          valorOriginal: getPreco(item.produto),
+          valorFinal: getPrecoItem(item),
+          desconto: item.desconto || (item.valorCustom !== null ? ((1 - item.valorCustom / getPreco(item.produto)) * 100) : 0),
+        })),
+      };
+
+      const res = await fetch('/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        const pedido = await res.json();
+        setPedidoCriado(pedido.id);
+      } else {
+        alert('Erro ao criar pedido');
+      }
+    } catch (err) {
+      alert('Erro ao criar pedido');
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  function copiarLinkPedido() {
+    if (pedidoCriado) {
+      const link = `${window.location.origin}/dashboard/estoque/pedido?id=${pedidoCriado}`;
+      navigator.clipboard.writeText(link);
+      alert('Link copiado!');
+    }
+  }
+
+  function novoPedido() {
+    setCarrinho([]);
+    setClienteNome('');
+    setClienteTelefone('');
+    setObservacoes('');
+    setPedidoCriado(null);
   }
 
   const categorias = [
@@ -203,41 +287,24 @@ export default function EstoquePage() {
     { id: 'COMPONENTE', label: 'Componentes', icon: '🔧' },
   ];
 
+  const podeEditarPreco = perfil === 'vendedor' || perfil === 'revenda';
+
   return (
     <div className="estoque-container">
       {/* Header */}
       <div className="estoque-header">
         <div className="estoque-header-left">
-          <h1>Catálogo de Estoque</h1>
+          <h1>Catálogo</h1>
           <span className="estoque-count">{produtosFiltrados.length} itens</span>
         </div>
         <div className="estoque-header-right">
-          {/* Seletor de Perfil */}
           <div className="perfil-selector">
-            <button 
-              className={`perfil-btn ${perfil === 'prateleira' ? 'active' : ''}`}
-              onClick={() => setPerfil('prateleira')}
-            >
-              Prateleira
-            </button>
-            <button 
-              className={`perfil-btn ${perfil === 'revenda' ? 'active' : ''}`}
-              onClick={() => setPerfil('revenda')}
-            >
-              Revenda
-            </button>
-            <button 
-              className={`perfil-btn ${perfil === 'vendedor' ? 'active' : ''}`}
-              onClick={() => setPerfil('vendedor')}
-            >
-              Vendedor
-            </button>
+            <button className={`perfil-btn ${perfil === 'prateleira' ? 'active' : ''}`} onClick={() => setPerfil('prateleira')}>Prateleira</button>
+            <button className={`perfil-btn ${perfil === 'revenda' ? 'active' : ''}`} onClick={() => setPerfil('revenda')}>Revenda</button>
+            <button className={`perfil-btn ${perfil === 'vendedor' ? 'active' : ''}`} onClick={() => setPerfil('vendedor')}>Vendedor</button>
           </div>
-          {/* Botão Carrinho */}
-          <button 
-            className="carrinho-btn"
-            onClick={() => setCarrinhoAberto(!carrinhoAberto)}
-          >
+          <a href="/dashboard/estoque/pedidos" className="btn-pedidos-link">📋 Pedidos</a>
+          <button className="carrinho-btn" onClick={() => setCarrinhoAberto(!carrinhoAberto)}>
             🛒 <span className="carrinho-badge">{carrinho.length}</span>
           </button>
         </div>
@@ -254,9 +321,7 @@ export default function EstoquePage() {
             <span className="cat-icon">{cat.icon}</span>
             <span className="cat-label">{cat.label}</span>
             {cat.id !== 'TODOS' && (
-              <span className="cat-count">
-                {produtos.filter(p => p.categoria === cat.id).length}
-              </span>
+              <span className="cat-count">{produtos.filter(p => p.categoria === cat.id).length}</span>
             )}
           </button>
         ))}
@@ -271,43 +336,33 @@ export default function EstoquePage() {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
         />
-        {busca && (
-          <button className="busca-clear" onClick={() => setBusca('')}>✕</button>
-        )}
+        {busca && <button className="busca-limpar" onClick={() => setBusca('')}>✕</button>}
       </div>
 
       {/* Grid de Produtos */}
       {loading ? (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Carregando estoque...</p>
-        </div>
+        <div className="loading-container"><div className="spinner"></div><p>Carregando catálogo...</p></div>
       ) : (
         <div className="produtos-grid">
           <AnimatePresence>
-            {produtosFiltrados.map((produto, idx) => (
+            {produtosFiltrados.map((produto) => (
               <motion.div
                 key={produto.id}
-                className={`produto-card ${produtoExpandido === produto.id ? 'expanded' : ''}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ delay: Math.min(idx * 0.02, 0.5), duration: 0.3 }}
-                whileHover={{ scale: 1.02, y: -4 }}
-                onClick={() => setProdutoExpandido(produtoExpandido === produto.id ? null : produto.id)}
+                className="produto-card"
                 layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.03 }}
+                onClick={() => setProdutoExpandido(produtoExpandido === produto.id ? null : produto.id)}
               >
                 <div className="produto-card-header">
-                  <span className={`produto-categoria-tag cat-${produto.categoria.toLowerCase()}`}>
-                    {produto.categoria}
-                  </span>
+                  <span className={`produto-cat-badge cat-${produto.categoria.toLowerCase()}`}>{produto.categoria}</span>
                   <span className="produto-qtd">Qtd: {produto.quantidade}</span>
                 </div>
-                
                 <h3 className="produto-nome">{getNomeProduto(produto)}</h3>
                 <p className="produto-desc">{getDescricaoProduto(produto)}</p>
-                
-                <div className="produto-precos">
+                <div className="produto-preco-area">
                   <span className="produto-preco-principal">{formatCurrency(getPreco(produto))}</span>
                   {perfil === 'vendedor' && (
                     <div className="produto-precos-extra">
@@ -321,14 +376,8 @@ export default function EstoquePage() {
                   )}
                 </div>
 
-                {/* Detalhes expandidos */}
                 {produtoExpandido === produto.id && (
-                  <motion.div
-                    className="produto-detalhes"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
+                  <motion.div className="produto-detalhes" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
                     {produto.categoria === 'COMPUTADOR' && (
                       <>
                         <div className="detalhe-item"><span>Modalidade:</span><span>{produto.modalidade}</span></div>
@@ -356,17 +405,13 @@ export default function EstoquePage() {
                         <div className="detalhe-item"><span>Tecnologia:</span><span>{produto.tecnologia}</span></div>
                         <div className="detalhe-item"><span>Frequência:</span><span>{produto.frequencia}</span></div>
                         <div className="detalhe-item"><span>Interface:</span><span>{produto.interface_}</span></div>
-                        <div className="detalhe-item"><span>Pé:</span><span>{produto.pe}</span></div>
                         <div className="detalhe-item"><span>Estado:</span><span>{produto.estado}</span></div>
                       </>
                     )}
                   </motion.div>
                 )}
 
-                <button 
-                  className="btn-adicionar"
-                  onClick={(e) => { e.stopPropagation(); adicionarAoCarrinho(produto); }}
-                >
+                <button className="btn-adicionar" onClick={(e) => { e.stopPropagation(); adicionarAoCarrinho(produto); }}>
                   + Adicionar
                 </button>
               </motion.div>
@@ -390,18 +435,105 @@ export default function EstoquePage() {
               <button className="carrinho-fechar" onClick={() => setCarrinhoAberto(false)}>✕</button>
             </div>
 
-            {carrinho.length === 0 ? (
+            {pedidoCriado ? (
+              <div className="pedido-sucesso">
+                <div className="pedido-sucesso-icon">✅</div>
+                <h3>Pedido Criado!</h3>
+                <p className="pedido-id">{pedidoCriado}</p>
+                <div className="pedido-link-area">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/estoque/pedido?id=${pedidoCriado}`}
+                    className="pedido-link-input"
+                  />
+                  <button className="btn-copiar-link" onClick={copiarLinkPedido}>📋 Copiar Link</button>
+                </div>
+                <div className="pedido-sucesso-acoes">
+                  <a href={`/dashboard/estoque/pedido?id=${pedidoCriado}`} className="btn-ver-pedido">Ver Pedido</a>
+                  <button className="btn-novo-pedido" onClick={novoPedido}>+ Novo Pedido</button>
+                </div>
+              </div>
+            ) : carrinho.length === 0 ? (
               <p className="carrinho-vazio">Nenhum item no carrinho</p>
             ) : (
               <>
+                {/* Dados do Cliente */}
+                <div className="carrinho-cliente">
+                  <input
+                    type="text"
+                    placeholder="Nome do cliente"
+                    value={clienteNome}
+                    onChange={(e) => setClienteNome(e.target.value)}
+                    className="input-cliente"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Telefone (WhatsApp)"
+                    value={clienteTelefone}
+                    onChange={(e) => setClienteTelefone(e.target.value)}
+                    className="input-cliente"
+                  />
+                  <textarea
+                    placeholder="Observações..."
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    className="input-obs"
+                    rows={2}
+                  />
+                </div>
+
                 <div className="carrinho-itens">
                   {carrinho.map(item => (
                     <div key={item.produto.id} className="carrinho-item">
                       <div className="carrinho-item-info">
                         <span className="carrinho-item-nome">{getNomeProduto(item.produto)}</span>
                         <span className="carrinho-item-desc">{getDescricaoProduto(item.produto)}</span>
-                        <span className="carrinho-item-preco">{formatCurrency(getPreco(item.produto))}</span>
+                        <div className="carrinho-item-precos">
+                          {(item.desconto > 0 || item.valorCustom !== null) && (
+                            <span className="preco-original-riscado">{formatCurrency(getPreco(item.produto))}</span>
+                          )}
+                          <span className="carrinho-item-preco">{formatCurrency(getPrecoItem(item))}</span>
+                        </div>
                       </div>
+
+                      {/* Controles de desconto/preço - apenas para vendedor e revenda */}
+                      {podeEditarPreco && (
+                        <div className="carrinho-item-desconto">
+                          {editandoPreco === item.produto.id ? (
+                            <div className="editar-preco-area">
+                              <div className="desconto-row">
+                                <label>Desconto %:</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={item.desconto}
+                                  onChange={(e) => aplicarDesconto(item.produto.id, parseFloat(e.target.value) || 0)}
+                                  className="input-desconto"
+                                />
+                              </div>
+                              <div className="desconto-row">
+                                <label>Preço final:</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.valorCustom !== null ? item.valorCustom : getPrecoItem(item)}
+                                  onChange={(e) => alterarPrecoFinal(item.produto.id, parseFloat(e.target.value) || 0)}
+                                  className="input-preco-final"
+                                />
+                              </div>
+                              <button className="btn-fechar-edicao" onClick={() => setEditandoPreco(null)}>OK</button>
+                            </div>
+                          ) : (
+                            <button className="btn-editar-preco" onClick={() => setEditandoPreco(item.produto.id)}>
+                              ✏️ Editar preço
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       <div className="carrinho-item-acoes">
                         <button onClick={() => alterarQuantidadeCarrinho(item.produto.id, item.quantidade - 1)}>−</button>
                         <span>{item.quantidade}</span>
@@ -409,24 +541,49 @@ export default function EstoquePage() {
                         <button className="btn-remover" onClick={() => removerDoCarrinho(item.produto.id)}>🗑</button>
                       </div>
                       <span className="carrinho-item-subtotal">
-                        {formatCurrency(getPreco(item.produto) * item.quantidade)}
+                        {formatCurrency(getPrecoItem(item) * item.quantidade)}
                       </span>
                     </div>
                   ))}
                 </div>
 
                 <div className="carrinho-footer">
+                  {subtotalOriginal() !== totalCarrinho() && (
+                    <div className="carrinho-subtotal-original">
+                      <span>Subtotal original:</span>
+                      <span className="valor-riscado">{formatCurrency(subtotalOriginal())}</span>
+                    </div>
+                  )}
                   <div className="carrinho-total">
                     <span>Total:</span>
                     <strong>{formatCurrency(totalCarrinho())}</strong>
                   </div>
+                  {subtotalOriginal() !== totalCarrinho() && (
+                    <div className="carrinho-economia">
+                      Economia: {formatCurrency(subtotalOriginal() - totalCarrinho())} ({((1 - totalCarrinho() / subtotalOriginal()) * 100).toFixed(1)}%)
+                    </div>
+                  )}
                   <div className="carrinho-acoes">
-                    <button className="btn-whatsapp" onClick={enviarWhatsApp}>
-                      📱 WhatsApp
+                    <button className="btn-whatsapp" onClick={enviarWhatsApp}>📱 WhatsApp</button>
+                    <button className="btn-pdf" onClick={gerarPDF}>📄 PDF</button>
+                  </div>
+                  <div className="carrinho-acoes-pedido">
+                    <button 
+                      className="btn-salvar-pedido" 
+                      onClick={() => gerarPedido(false)}
+                      disabled={gerando}
+                    >
+                      💾 Salvar Rascunho
                     </button>
-                    <button className="btn-pdf" onClick={gerarPDF}>
-                      📄 Gerar PDF
-                    </button>
+                    {podeEditarPreco && (
+                      <button 
+                        className="btn-enviar-aprovacao" 
+                        onClick={() => gerarPedido(true)}
+                        disabled={gerando}
+                      >
+                        📤 Enviar p/ Aprovação
+                      </button>
+                    )}
                   </div>
                 </div>
               </>

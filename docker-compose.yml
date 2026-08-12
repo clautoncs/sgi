@@ -10,5 +10,6 @@ services:
       - ./users.json:/app/users.json
       - ./roles.json:/app/roles.json
       - /root/google-credentials.json:/app/google-credentials.json:ro
+      - /root/pedidos.json:/app/data/pedidos.json
     ports:
       - "127.0.0.1:3000:3000"
