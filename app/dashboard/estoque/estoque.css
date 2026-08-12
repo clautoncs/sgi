@@ -594,6 +594,23 @@
   }
 }
 
+/* Atualização automática */
+.estoque-atualizado {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-left: 12px;
+}
+
+.auto-badge {
+  background: #166534;
+  color: #4ade80;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
 /* Botão de Pedidos */
 .btn-pedidos-link {
   padding: 8px 14px;
@@ -846,4 +863,25 @@
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Link de foto no card de produto */
+.produto-foto-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  margin-bottom: 6px;
+}
+.produto-foto-link:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #764ba2, #667eea);
 }

@@ -53,9 +53,14 @@ export default function EstoquePage() {
   const [gerando, setGerando] = useState(false);
   const [pedidoCriado, setPedidoCriado] = useState<string | null>(null);
   const [editandoPreco, setEditandoPreco] = useState<string | null>(null);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
 
   useEffect(() => {
     fetchEstoque();
+    const interval = setInterval(() => {
+      fetchEstoque();
+    }, 2 * 60 * 1000); // 2 minutos
+    return () => clearInterval(interval);
   }, []);
 
   async function fetchEstoque() {
@@ -64,6 +69,7 @@ export default function EstoquePage() {
       const res = await fetch('/api/estoque');
       const data = await res.json();
       setProdutos(data.produtos || []);
+      setUltimaAtualizacao(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
       console.error('Erro ao buscar estoque:', err);
     } finally {
@@ -296,6 +302,9 @@ export default function EstoquePage() {
         <div className="estoque-header-left">
           <h1>Catálogo</h1>
           <span className="estoque-count">{produtosFiltrados.length} itens</span>
+          {ultimaAtualizacao && (
+            <span className="estoque-atualizado">Atualizado: {ultimaAtualizacao} <span className="auto-badge">Auto 2min</span></span>
+          )}
         </div>
         <div className="estoque-header-right">
           <div className="perfil-selector">
@@ -360,6 +369,11 @@ export default function EstoquePage() {
                   <span className={`produto-cat-badge cat-${produto.categoria.toLowerCase()}`}>{produto.categoria}</span>
                   <span className="produto-qtd">Qtd: {produto.quantidade}</span>
                 </div>
+                {produto.foto && (
+                  <a href={produto.foto} target="_blank" rel="noopener noreferrer" className="produto-foto-link" onClick={(e) => e.stopPropagation()}>
+                    📷 Ver Fotos
+                  </a>
+                )}
                 <h3 className="produto-nome">{getNomeProduto(produto)}</h3>
                 <p className="produto-desc">{getDescricaoProduto(produto)}</p>
                 <div className="produto-preco-area">

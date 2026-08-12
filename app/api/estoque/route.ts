@@ -20,6 +20,13 @@ function parseNumber(val: any): number {
   return isNaN(num) ? 0 : num;
 }
 
+function cleanFoto(val: any): string {
+  if (!val) return "";
+  const str = String(val).trim();
+  if (str.startsWith("http")) return str;
+  if (str.includes("google.com") || str.includes("goo.gl")) return str;
+  return "";
+}
 function cleanText(val: any): string {
   if (!val) return '';
   return String(val).replace(/^\*|\*$/g, '').replace(/💻|✅|❗|🔴|🟡|🟢/g, '').trim();
@@ -40,7 +47,7 @@ function parseComputadores(rows: any[][]): any[] {
     ssd: cleanText(row[8]),
     video: cleanText(row[9]),
     valor: parseNumber(row[10]),
-    foto: cleanText(row[12]),
+    foto: cleanFoto(row[12]),
     custo: parseNumber(row[15]),
     revenda: parseNumber(row[15]) * 1.3, // 30% margem revenda
     status: cleanText(row[14]),
@@ -61,7 +68,7 @@ function parseNotebooks(rows: any[][]): any[] {
     ssd: cleanText(row[8]),
     resolucao: cleanText(row[9]),
     valor: parseNumber(row[10]),
-    foto: cleanText(row[12]),
+    foto: cleanFoto(row[12]),
     revenda: parseNumber(row[14]),
     custo: parseNumber(row[18]),
     status: cleanText(row[13]),
@@ -83,7 +90,7 @@ function parseMonitores(rows: any[][]): any[] {
     interface_: cleanText(row[10]),
     pe: cleanText(row[13]),
     valor: parseNumber(row[16]),
-    foto: cleanText(row[17]),
+    foto: cleanFoto(row[17]),
     revenda: parseNumber(row[20]) * 1.3,
     custo: parseNumber(row[20]),
     status: cleanText(row[19]),
@@ -98,7 +105,7 @@ function parseComponentes(rows: any[][]): any[] {
     quantidade: parseInt(row[1]) || 0,
     produto: cleanText(row[3]),
     valor: parseNumber(row[4]),
-    foto: cleanText(row[5]),
+    foto: cleanFoto(row[5]),
     revenda: parseNumber(row[8]),
     custo: parseNumber(row[9]),
     status: cleanText(row[7]),
