@@ -16,31 +16,24 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email e senha são obrigatórios");
         }
-
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: { role: true },
         });
-
         if (!user || !user.isActive) {
           throw new Error("Credenciais inválidas");
         }
-
         if (!user.password) {
           throw new Error("Use o login via Google para esta conta");
         }
-
         const isValid = await compare(credentials.password, user.password);
         if (!isValid) {
           throw new Error("Credenciais inválidas");
         }
-
-        // Atualizar último login
         await prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
         });
-
         return {
           id: user.id,
           name: user.name,
@@ -65,7 +58,6 @@ export const authOptions: NextAuthOptions = {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
         });
-
         if (existingUser) {
           await prisma.user.update({
             where: { id: existingUser.id },
@@ -77,10 +69,10 @@ export const authOptions: NextAuthOptions = {
             },
           });
         } else {
+          // Novo usuário SSO: atribuir perfil padrão "viewer" (visualizador de estoque varejo)
           const viewerRole = await prisma.role.findFirst({
             where: { name: "viewer" },
           });
-
           await prisma.user.create({
             data: {
               name: user.name || "Usuário Google",
@@ -89,6 +81,7 @@ export const authOptions: NextAuthOptions = {
               provider: "google",
               providerId: account.providerAccountId,
               roleId: viewerRole?.id || "",
+              isActive: true,
             },
           });
         }

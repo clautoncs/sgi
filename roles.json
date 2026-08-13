@@ -1,11 +1,21 @@
 {
+  "defaultRole": "role_viewer",
+  "defaultEstoqueProfile": "varejo",
   "pages": [
     { "code": "dashboard.painel", "label": "Painel Principal", "module": "Dashboard" },
     { "code": "dashboard.vendas", "label": "Dashboard de Vendas", "module": "Dashboard" },
+    { "code": "estoque.catalogo", "label": "Catálogo de Estoque", "module": "Estoque" },
+    { "code": "estoque.pedidos", "label": "Pedidos", "module": "Estoque" },
+    { "code": "estoque.carrinho", "label": "Carrinho / Propostas", "module": "Estoque" },
     { "code": "config.metas", "label": "Configuração de Metas", "module": "Configurações" },
     { "code": "config.integracoes", "label": "Integrações", "module": "Configurações" },
     { "code": "admin.usuarios", "label": "Gerenciar Usuários", "module": "Administração" },
     { "code": "admin.permissoes", "label": "Gerenciar Permissões", "module": "Administração" }
+  ],
+  "estoqueProfiles": [
+    { "code": "varejo", "label": "Varejo (Prateleira)", "description": "Visualiza apenas preço de prateleira" },
+    { "code": "atacado", "label": "Atacado + Varejo (Revenda)", "description": "Visualiza preço de prateleira e revenda" },
+    { "code": "full", "label": "Full (Vendedor)", "description": "Visualiza todos os preços incluindo custo" }
   ],
   "roles": [
     {
@@ -14,13 +24,17 @@
       "label": "Administrador do Sistema",
       "description": "Acesso total a todas as funcionalidades do sistema",
       "isSystem": true,
+      "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": true, "manage": true },
-        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": true, "manage": true },
-        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": true, "manage": true },
-        { "page": "config.integracoes", "label": "Integrações", "view": true, "edit": true, "manage": true },
-        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": true, "edit": true, "manage": true },
-        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": true, "edit": true, "manage": true }
+        { "page": "dashboard.painel", "view": true, "edit": true, "manage": true },
+        { "page": "dashboard.vendas", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.catalogo", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": true },
+        { "page": "config.metas", "view": true, "edit": true, "manage": true },
+        { "page": "config.integracoes", "view": true, "edit": true, "manage": true },
+        { "page": "admin.usuarios", "view": true, "edit": true, "manage": true },
+        { "page": "admin.permissoes", "view": true, "edit": true, "manage": true }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -28,15 +42,19 @@
       "id": "role_manager",
       "name": "manager",
       "label": "Gerente",
-      "description": "Acesso a dashboards e configurações, sem administração",
+      "description": "Acesso a dashboards, estoque completo e configurações",
       "isSystem": true,
+      "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": true, "manage": false },
-        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": true, "manage": true },
-        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": true, "manage": false },
-        { "page": "config.integracoes", "label": "Integrações", "view": true, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
-        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+        { "page": "dashboard.painel", "view": true, "edit": true, "manage": false },
+        { "page": "dashboard.vendas", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.catalogo", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": true },
+        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": false },
+        { "page": "config.metas", "view": true, "edit": true, "manage": false },
+        { "page": "config.integracoes", "view": true, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "view": true, "edit": true, "manage": false },
+        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -44,15 +62,19 @@
       "id": "role_seller",
       "name": "seller",
       "label": "Vendedor",
-      "description": "Visualização dos dashboards de vendas apenas",
+      "description": "Acesso a vendas e estoque com preços de revenda",
       "isSystem": true,
+      "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": false, "manage": false },
-        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": false, "manage": false },
-        { "page": "config.metas", "label": "Configuração de Metas", "view": true, "edit": false, "manage": false },
-        { "page": "config.integracoes", "label": "Integrações", "view": false, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
-        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+        { "page": "dashboard.painel", "view": true, "edit": false, "manage": false },
+        { "page": "dashboard.vendas", "view": true, "edit": false, "manage": false },
+        { "page": "estoque.catalogo", "view": true, "edit": false, "manage": false },
+        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": false },
+        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": false },
+        { "page": "config.metas", "view": true, "edit": false, "manage": false },
+        { "page": "config.integracoes", "view": false, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "view": false, "edit": false, "manage": false },
+        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -60,15 +82,19 @@
       "id": "role_viewer",
       "name": "viewer",
       "label": "Visualizador",
-      "description": "Apenas visualização básica do painel",
+      "description": "Visualização do catálogo de estoque (varejo) - perfil padrão para novos usuários",
       "isSystem": true,
+      "estoqueProfile": "varejo",
       "permissions": [
-        { "page": "dashboard.painel", "label": "Painel Principal", "view": true, "edit": false, "manage": false },
-        { "page": "dashboard.vendas", "label": "Dashboard de Vendas", "view": true, "edit": false, "manage": false },
-        { "page": "config.metas", "label": "Configuração de Metas", "view": false, "edit": false, "manage": false },
-        { "page": "config.integracoes", "label": "Integrações", "view": false, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "label": "Gerenciar Usuários", "view": false, "edit": false, "manage": false },
-        { "page": "admin.permissoes", "label": "Gerenciar Permissões", "view": false, "edit": false, "manage": false }
+        { "page": "dashboard.painel", "view": false, "edit": false, "manage": false },
+        { "page": "dashboard.vendas", "view": false, "edit": false, "manage": false },
+        { "page": "estoque.catalogo", "view": true, "edit": false, "manage": false },
+        { "page": "estoque.pedidos", "view": false, "edit": false, "manage": false },
+        { "page": "estoque.carrinho", "view": true, "edit": false, "manage": false },
+        { "page": "config.metas", "view": false, "edit": false, "manage": false },
+        { "page": "config.integracoes", "view": false, "edit": false, "manage": false },
+        { "page": "admin.usuarios", "view": false, "edit": false, "manage": false },
+        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     }
