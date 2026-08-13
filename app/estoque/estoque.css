@@ -885,3 +885,140 @@
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
   background: linear-gradient(135deg, #764ba2, #667eea);
 }
+
+/* ============================================================
+   Calculadora de Custos - Perfil Full/Vendedor
+   ============================================================ */
+.calculadora-custos {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  margin: 0 0 12px 0;
+  overflow: hidden;
+}
+
+.calc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.calc-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a78bfa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.calc-body {
+  padding: 10px 12px;
+}
+
+.calc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.calc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calc-field label {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.calc-input-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.calc-input {
+  width: 60px;
+  padding: 4px 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.calc-input:focus { outline: none; border-color: #8b5cf6; }
+
+.calc-suffix {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.calc-select {
+  width: 100%;
+  padding: 4px 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #f1f5f9;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+}
+.calc-select:focus { outline: none; border-color: #8b5cf6; }
+
+.calc-valor-abs {
+  font-size: 0.68rem;
+  color: #f87171;
+  font-weight: 500;
+}
+
+/* Resumo */
+.calc-resumo {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.calc-resumo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.calc-resumo-item span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.calc-resumo-item strong {
+  font-size: 0.78rem;
+}
+
+.calc-resumo-item .valor-positivo { color: #34d399; }
+.calc-resumo-item .valor-negativo { color: #f87171; }
+
+.calc-resumo-divider {
+  height: 1px;
+  background: #334155;
+  margin: 6px 0;
+}
+
+.calc-lucro {
+  padding: 4px 0 !important;
+}
+.calc-lucro span { font-weight: 600; font-size: 0.78rem !important; }
+.calc-lucro strong { font-size: 0.9rem !important; }
+.calc-lucro.positivo span, .calc-lucro.positivo strong { color: #10b981; }
+.calc-lucro.negativo span, .calc-lucro.negativo strong { color: #ef4444; }
+
+.calc-margem span { font-weight: 500; }
+.calc-margem strong { font-size: 0.82rem !important; }
+.calc-margem.positivo strong { color: #10b981; }
+.calc-margem.negativo strong { color: #ef4444; }

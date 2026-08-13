@@ -53,6 +53,12 @@ export default function EstoquePage() {
   const [gerando, setGerando] = useState(false);
   const [pedidoCriado, setPedidoCriado] = useState<string | null>(null);
   const [editandoPreco, setEditandoPreco] = useState<string | null>(null);
+  // Calculadora de custos (perfil full/vendedor)
+  const [taxasConfig, setTaxasConfig] = useState<{imposto: {percentual: number, label: string}, canais: {id: string, label: string, percentual: number, descricao: string}[]} | null>(null);
+  const [impostoCustom, setImpostoCustom] = useState<number | null>(null);
+  const [canalSelecionado, setCanalSelecionado] = useState<string>('vendedor');
+  const [canalCustom, setCanalCustom] = useState<number | null>(null);
+
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>('');
 
   useEffect(() => {
@@ -62,6 +68,16 @@ export default function EstoquePage() {
     }, 2 * 60 * 1000); // 2 minutos
     return () => clearInterval(interval);
   }, []);
+
+
+  // Buscar configuração de taxas
+  useEffect(() => {
+    if (perfil === 'vendedor') {
+      fetch('/api/taxas').then(r => r.json()).then(data => {
+        setTaxasConfig(data);
+      }).catch(console.error);
+    }
+  }, [perfil]);
 
   async function fetchEstoque() {
     try {
@@ -285,6 +301,34 @@ export default function EstoquePage() {
     setPedidoCriado(null);
   }
 
+
+  // Cálculos da calculadora
+  function custoTotalCarrinho(): number {
+    return carrinho.reduce((acc, item) => acc + ((item.produto.custo || 0) * item.quantidade), 0);
+  }
+  function getImpostoPercentual(): number {
+    if (impostoCustom !== null) return impostoCustom;
+    return taxasConfig?.imposto?.percentual || 12;
+  }
+  function getCanalPercentual(): number {
+    if (canalCustom !== null) return canalCustom;
+    const canal = taxasConfig?.canais?.find(c => c.id === canalSelecionado);
+    return canal?.percentual || 0;
+  }
+  function calcImpostoValor(): number {
+    return totalCarrinho() * (getImpostoPercentual() / 100);
+  }
+  function calcCanalValor(): number {
+    return totalCarrinho() * (getCanalPercentual() / 100);
+  }
+  function calcLucroLiquido(): number {
+    return totalCarrinho() - custoTotalCarrinho() - calcImpostoValor() - calcCanalValor();
+  }
+  function calcMargemLucro(): number {
+    if (totalCarrinho() <= 0) return 0;
+    return (calcLucroLiquido() / totalCarrinho()) * 100;
+  }
+
   const categorias = [
     { id: 'TODOS', label: 'Todos', icon: '📦' },
     { id: 'COMPUTADOR', label: 'Computadores', icon: '🖥️' },
@@ -497,6 +541,95 @@ export default function EstoquePage() {
                   />
                 </div>
 
+
+                {/* Calculadora de Custos - apenas perfil vendedor (full) */}
+                {perfil === 'vendedor' && carrinho.length > 0 && (
+                  <div className="calculadora-custos">
+                    <div className="calc-header">
+                      <span className="calc-title">Calculadora de Custos</span>
+                    </div>
+                    <div className="calc-body">
+                      <div className="calc-row">
+                        <div className="calc-field">
+                          <label>Imposto (NF)</label>
+                          <div className="calc-input-group">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={impostoCustom !== null ? impostoCustom : (taxasConfig?.imposto?.percentual || 12)}
+                              onChange={(e) => setImpostoCustom(parseFloat(e.target.value) || 0)}
+                              className="calc-input"
+                            />
+                            <span className="calc-suffix">%</span>
+                          </div>
+                          <span className="calc-valor-abs">{formatCurrency(calcImpostoValor())}</span>
+                        </div>
+                        <div className="calc-field">
+                          <label>Canal de Venda</label>
+                          <select
+                            value={canalSelecionado}
+                            onChange={(e) => { setCanalSelecionado(e.target.value); setCanalCustom(null); }}
+                            className="calc-select"
+                          >
+                            {taxasConfig?.canais?.map(c => (
+                              <option key={c.id} value={c.id}>{c.label}</option>
+                            )) || (
+                              <>
+                                <option value="vendedor">Vendedor (Loja)</option>
+                                <option value="shopee">Shopee</option>
+                                <option value="licitador">Licitador</option>
+                              </>
+                            )}
+                          </select>
+                          <div className="calc-input-group">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={canalCustom !== null ? canalCustom : getCanalPercentual()}
+                              onChange={(e) => setCanalCustom(parseFloat(e.target.value) || 0)}
+                              className="calc-input"
+                            />
+                            <span className="calc-suffix">%</span>
+                          </div>
+                          <span className="calc-valor-abs">{formatCurrency(calcCanalValor())}</span>
+                        </div>
+                      </div>
+                      <div className="calc-resumo">
+                        <div className="calc-resumo-item">
+                          <span>Receita (venda)</span>
+                          <strong className="valor-positivo">{formatCurrency(totalCarrinho())}</strong>
+                        </div>
+                        <div className="calc-resumo-item">
+                          <span>Custo dos produtos</span>
+                          <strong className="valor-negativo">- {formatCurrency(custoTotalCarrinho())}</strong>
+                        </div>
+                        <div className="calc-resumo-item">
+                          <span>Imposto ({getImpostoPercentual().toFixed(1)}%)</span>
+                          <strong className="valor-negativo">- {formatCurrency(calcImpostoValor())}</strong>
+                        </div>
+                        {getCanalPercentual() > 0 && (
+                          <div className="calc-resumo-item">
+                            <span>{taxasConfig?.canais?.find(c => c.id === canalSelecionado)?.label || 'Canal'} ({getCanalPercentual().toFixed(1)}%)</span>
+                            <strong className="valor-negativo">- {formatCurrency(calcCanalValor())}</strong>
+                          </div>
+                        )}
+                        <div className="calc-resumo-divider" />
+                        <div className={`calc-resumo-item calc-lucro ${calcLucroLiquido() >= 0 ? 'positivo' : 'negativo'}`}>
+                          <span>Lucro Líquido</span>
+                          <strong>{formatCurrency(calcLucroLiquido())}</strong>
+                        </div>
+                        <div className={`calc-resumo-item calc-margem ${calcMargemLucro() >= 0 ? 'positivo' : 'negativo'}`}>
+                          <span>Margem</span>
+                          <strong>{calcMargemLucro().toFixed(1)}%</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="carrinho-itens">
                   {carrinho.map(item => (
                     <div key={item.produto.id} className="carrinho-item">

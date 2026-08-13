@@ -11,5 +11,6 @@ services:
       - ./roles.json:/app/roles.json
       - /root/google-credentials.json:/app/google-credentials.json:ro
       - /root/pedidos.json:/app/data/pedidos.json
+      - /root/taxas.json:/app/taxas.json
     ports:
       - "127.0.0.1:3000:3000"
