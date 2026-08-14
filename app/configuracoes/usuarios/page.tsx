@@ -11,6 +11,7 @@ interface User {
   avatar?: string;
   provider: 'local' | 'google';
   role: string;
+  roleId?: string;
   isActive: boolean;
   isApproved: boolean;
   lastLoginAt?: string;
@@ -294,8 +295,8 @@ export default function UsuariosPage() {
               <div className="form-group">
                 <label>Perfil de Acesso</label>
                 <select
-                  value={editingUser.role}
-                  onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                  value={editingUser.roleId || editingUser.role}
+                  onChange={e => setEditingUser({ ...editingUser, role: e.target.value, roleId: e.target.value })}
                 >
                   {roles.map(r => (
                     <option key={r.id} value={r.id}>{r.label}</option>
@@ -306,7 +307,7 @@ export default function UsuariosPage() {
                 <button className="btn-cancel" onClick={() => setEditingUser(null)}>Cancelar</button>
                 <button
                   className="btn-primary"
-                  onClick={() => handleAction('update', { id: editingUser.id, name: editingUser.name, role: editingUser.role })}
+                  onClick={() => handleAction('update', { id: editingUser.id, name: editingUser.name, role: editingUser.roleId || editingUser.role })}
                 >
                   Salvar Alterações
                 </button>
