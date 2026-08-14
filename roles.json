@@ -2,20 +2,68 @@
   "defaultRole": "role_viewer",
   "defaultEstoqueProfile": "varejo",
   "pages": [
-    { "code": "dashboard.painel", "label": "Painel Principal", "module": "Dashboard" },
-    { "code": "dashboard.vendas", "label": "Dashboard de Vendas", "module": "Dashboard" },
-    { "code": "estoque.catalogo", "label": "Catálogo de Estoque", "module": "Estoque" },
-    { "code": "estoque.pedidos", "label": "Pedidos", "module": "Estoque" },
-    { "code": "estoque.carrinho", "label": "Carrinho / Propostas", "module": "Estoque" },
-    { "code": "config.metas", "label": "Configuração de Metas", "module": "Configurações" },
-    { "code": "config.integracoes", "label": "Integrações", "module": "Configurações" },
-    { "code": "admin.usuarios", "label": "Gerenciar Usuários", "module": "Administração" },
-    { "code": "admin.permissoes", "label": "Gerenciar Permissões", "module": "Administração" }
+    {
+      "code": "dashboard.painel",
+      "label": "Painel Principal",
+      "module": "Dashboard"
+    },
+    {
+      "code": "dashboard.vendas",
+      "label": "Dashboard de Vendas",
+      "module": "Dashboard"
+    },
+    {
+      "code": "estoque.catalogo",
+      "label": "Catálogo de Estoque",
+      "module": "Estoque"
+    },
+    {
+      "code": "estoque.pedidos",
+      "label": "Pedidos",
+      "module": "Estoque"
+    },
+    {
+      "code": "estoque.carrinho",
+      "label": "Carrinho / Propostas",
+      "module": "Estoque"
+    },
+    {
+      "code": "config.metas",
+      "label": "Configuração de Metas",
+      "module": "Configurações"
+    },
+    {
+      "code": "config.integracoes",
+      "label": "Integrações",
+      "module": "Configurações"
+    },
+    {
+      "code": "admin.usuarios",
+      "label": "Gerenciar Usuários",
+      "module": "Administração"
+    },
+    {
+      "code": "admin.permissoes",
+      "label": "Gerenciar Permissões",
+      "module": "Administração"
+    }
   ],
   "estoqueProfiles": [
-    { "code": "varejo", "label": "Varejo (Prateleira)", "description": "Visualiza apenas preço de prateleira" },
-    { "code": "atacado", "label": "Atacado + Varejo (Revenda)", "description": "Visualiza preço de prateleira e revenda" },
-    { "code": "full", "label": "Full (Vendedor)", "description": "Visualiza todos os preços incluindo custo" }
+    {
+      "code": "varejo",
+      "label": "Varejo (Prateleira)",
+      "description": "Visualiza apenas preço de prateleira"
+    },
+    {
+      "code": "atacado",
+      "label": "Atacado + Varejo (Revenda)",
+      "description": "Visualiza preço de prateleira e revenda"
+    },
+    {
+      "code": "full",
+      "label": "Full (Vendedor)",
+      "description": "Visualiza todos os preços incluindo custo"
+    }
   ],
   "roles": [
     {
@@ -26,15 +74,60 @@
       "isSystem": true,
       "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "view": true, "edit": true, "manage": true },
-        { "page": "dashboard.vendas", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.catalogo", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": true },
-        { "page": "config.metas", "view": true, "edit": true, "manage": true },
-        { "page": "config.integracoes", "view": true, "edit": true, "manage": true },
-        { "page": "admin.usuarios", "view": true, "edit": true, "manage": true },
-        { "page": "admin.permissoes", "view": true, "edit": true, "manage": true }
+        {
+          "page": "dashboard.painel",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "dashboard.vendas",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.catalogo",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.pedidos",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.carrinho",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "config.metas",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "config.integracoes",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "admin.usuarios",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "admin.permissoes",
+          "view": true,
+          "edit": true,
+          "manage": true
+        }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -46,15 +139,60 @@
       "isSystem": true,
       "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "view": true, "edit": true, "manage": false },
-        { "page": "dashboard.vendas", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.catalogo", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": true },
-        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": false },
-        { "page": "config.metas", "view": true, "edit": true, "manage": false },
-        { "page": "config.integracoes", "view": true, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "view": true, "edit": true, "manage": false },
-        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
+        {
+          "page": "dashboard.painel",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "dashboard.vendas",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.catalogo",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.pedidos",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "estoque.carrinho",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "config.metas",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "config.integracoes",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.usuarios",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -62,19 +200,64 @@
       "id": "role_seller",
       "name": "seller",
       "label": "Vendedor",
-      "description": "Acesso a vendas e estoque com preços de revenda",
+      "description": "Visualiza apenas Dashboard de Vendas e Estoque (perfil vendedor/full)",
       "isSystem": true,
       "estoqueProfile": "full",
       "permissions": [
-        { "page": "dashboard.painel", "view": true, "edit": false, "manage": false },
-        { "page": "dashboard.vendas", "view": true, "edit": false, "manage": false },
-        { "page": "estoque.catalogo", "view": true, "edit": false, "manage": false },
-        { "page": "estoque.pedidos", "view": true, "edit": true, "manage": false },
-        { "page": "estoque.carrinho", "view": true, "edit": true, "manage": false },
-        { "page": "config.metas", "view": true, "edit": false, "manage": false },
-        { "page": "config.integracoes", "view": false, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "view": false, "edit": false, "manage": false },
-        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
+        {
+          "page": "dashboard.painel",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.vendas",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.catalogo",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.pedidos",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "estoque.carrinho",
+          "view": true,
+          "edit": true,
+          "manage": false
+        },
+        {
+          "page": "config.metas",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "config.integracoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.usuarios",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     },
@@ -86,15 +269,60 @@
       "isSystem": true,
       "estoqueProfile": "varejo",
       "permissions": [
-        { "page": "dashboard.painel", "view": false, "edit": false, "manage": false },
-        { "page": "dashboard.vendas", "view": false, "edit": false, "manage": false },
-        { "page": "estoque.catalogo", "view": true, "edit": false, "manage": false },
-        { "page": "estoque.pedidos", "view": false, "edit": false, "manage": false },
-        { "page": "estoque.carrinho", "view": true, "edit": false, "manage": false },
-        { "page": "config.metas", "view": false, "edit": false, "manage": false },
-        { "page": "config.integracoes", "view": false, "edit": false, "manage": false },
-        { "page": "admin.usuarios", "view": false, "edit": false, "manage": false },
-        { "page": "admin.permissoes", "view": false, "edit": false, "manage": false }
+        {
+          "page": "dashboard.painel",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.vendas",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.catalogo",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.pedidos",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.carrinho",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "config.metas",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "config.integracoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.usuarios",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
     }
