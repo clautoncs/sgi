@@ -7,7 +7,6 @@ services:
       - .env
     volumes:
       - /root/metas.json:/app/metas.json
-      - ./users.json:/app/users.json
       - ./roles.json:/app/roles.json
       - /root/google-credentials.json:/app/google-credentials.json:ro
       - /root/pedidos.json:/app/data/pedidos.json

@@ -1,7 +1,7 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
 import { useState } from "react";
-import "./dashboard.css";
+import "@/styles/sidebar.css";
 
 export default function DashboardLayout({
   children,
@@ -22,7 +22,7 @@ export default function DashboardLayout({
             <span className="sidebar__logo-text">SGI</span>
             <span className="sidebar__logo-dot">.</span>
           </div>
-          {sidebarOpen && <span className="sidebar__version">v0.3.0</span>}
+          {sidebarOpen && <span className="sidebar__version">v0.4.0</span>}
         </div>
 
         <nav className="sidebar__nav">

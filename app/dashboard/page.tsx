@@ -146,7 +146,7 @@ export default function DashboardPage() {
           <div className="system-info">
             <div className="system-info__item">
               <span className="system-info__label">Versão</span>
-              <span className="system-info__value">v0.3.0</span>
+              <span className="system-info__value">v0.4.0</span>
             </div>
             <div className="system-info__item">
               <span className="system-info__label">Ambiente</span>
