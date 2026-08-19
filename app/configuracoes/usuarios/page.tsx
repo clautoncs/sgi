@@ -12,6 +12,7 @@ interface User {
   provider: 'local' | 'google';
   role: string;
   roleId?: string;
+  roleName?: string;
   isActive: boolean;
   isApproved: boolean;
   lastLoginAt?: string;
@@ -31,7 +32,9 @@ export default function UsuariosPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'pending' | 'blocked'>('all');
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'viewer' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'viewer', password: '', provider: 'local' });
+  const [editPassword, setEditPassword] = useState('');
+  const [editProvider, setEditProvider] = useState<'local' | 'google'>('local');
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,13 +63,34 @@ export default function UsuariosPage() {
         fetchData();
         setShowCreateModal(false);
         setEditingUser(null);
-        setNewUser({ name: '', email: '', role: 'viewer' });
+        setNewUser({ name: '', email: '', role: 'viewer', password: '', provider: 'local' });
+        setEditPassword('');
       } else {
         alert(result.error || 'Erro ao processar');
       }
     } catch (err) {
       alert('Erro de conexão');
     }
+  };
+
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setEditProvider(user.provider);
+    setEditPassword('');
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingUser) return;
+    const data: any = {
+      id: editingUser.id,
+      name: editingUser.name,
+      role: editingUser.roleId || editingUser.role,
+      provider: editProvider,
+    };
+    if (editPassword.trim()) {
+      data.password = editPassword;
+    }
+    handleAction('update', data);
   };
 
   const filteredUsers = users.filter(u => {
@@ -106,18 +130,19 @@ export default function UsuariosPage() {
 
       {/* Filtros */}
       <div className="filter-tabs">
-        <button className={`filter-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
+        <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
           Todos ({users.length})
         </button>
-        <button className={`filter-tab ${filter === 'active' ? 'active' : ''}`} onClick={() => setFilter('active')}>
-          Ativos ({users.filter(u => u.isActive && u.isApproved).length})
+        <button className={filter === 'active' ? 'active' : ''} onClick={() => setFilter('active')}>
+          Ativos
         </button>
-        <button className={`filter-tab ${filter === 'pending' ? 'active' : ''}`} onClick={() => setFilter('pending')}>
-          Pendentes ({pendingCount})
-          {pendingCount > 0 && <span className="pending-badge">{pendingCount}</span>}
-        </button>
-        <button className={`filter-tab ${filter === 'blocked' ? 'active' : ''}`} onClick={() => setFilter('blocked')}>
-          Bloqueados ({users.filter(u => !u.isActive).length})
+        {pendingCount > 0 && (
+          <button className={filter === 'pending' ? 'active' : ''} onClick={() => setFilter('pending')}>
+            Pendentes ({pendingCount})
+          </button>
+        )}
+        <button className={filter === 'blocked' ? 'active' : ''} onClick={() => setFilter('blocked')}>
+          Bloqueados
         </button>
       </div>
 
@@ -127,7 +152,7 @@ export default function UsuariosPage() {
           {filteredUsers.map((user, idx) => (
             <motion.div
               key={user.id}
-              className={`user-card ${!user.isActive ? 'blocked' : ''} ${!user.isApproved ? 'pending' : ''}`}
+              className="user-card"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -150,7 +175,6 @@ export default function UsuariosPage() {
                   {user.provider === 'google' ? '🔵 Google' : '🔒 Local'}
                 </span>
               </div>
-
               <div className="user-card-body">
                 <div className="user-meta">
                   <span className="role-tag">{user.role}</span>
@@ -164,41 +188,34 @@ export default function UsuariosPage() {
                   </p>
                 )}
               </div>
-
               <div className="user-card-actions">
                 {!user.isApproved && (
                   <button className="btn-approve" onClick={() => handleAction('approve', { id: user.id })}>
                     ✓ Aprovar
                   </button>
                 )}
-                {user.isActive && user.isApproved && (
-                  <button className="btn-edit" onClick={() => setEditingUser(user)}>
-                    Editar
-                  </button>
-                )}
+                <button className="btn-edit" onClick={() => openEditModal(user)}>
+                  Editar
+                </button>
                 {user.isActive ? (
                   <button className="btn-block" onClick={() => handleAction('block', { id: user.id })}>
                     Bloquear
                   </button>
                 ) : (
                   <button className="btn-approve" onClick={() => handleAction('approve', { id: user.id })}>
-                    Reativar
+                    Desbloquear
                   </button>
                 )}
-                <button className="btn-delete" onClick={() => {
+                <button className="btn-danger" onClick={() => {
                   if (confirm(`Excluir ${user.name}?`)) handleAction('delete', { id: user.id });
                 }}>
-                  ✕
+                  Excluir
                 </button>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
-
-      {filteredUsers.length === 0 && (
-        <p className="no-results">Nenhum usuário encontrado com este filtro</p>
-      )}
 
       {/* Modal Criar Usuário */}
       <AnimatePresence>
@@ -237,6 +254,27 @@ export default function UsuariosPage() {
                 />
               </div>
               <div className="form-group">
+                <label>Tipo de Login</label>
+                <select
+                  value={newUser.provider}
+                  onChange={e => setNewUser({ ...newUser, provider: e.target.value })}
+                >
+                  <option value="local">Local (email + senha)</option>
+                  <option value="google">Google SSO</option>
+                </select>
+              </div>
+              {newUser.provider === 'local' && (
+                <div className="form-group">
+                  <label>Senha</label>
+                  <input
+                    type="password"
+                    value={newUser.password}
+                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                    placeholder="Senha de acesso"
+                  />
+                </div>
+              )}
+              <div className="form-group">
                 <label>Perfil de Acesso</label>
                 <select
                   value={newUser.role}
@@ -249,11 +287,13 @@ export default function UsuariosPage() {
               </div>
               <div className="modal-actions">
                 <button className="btn-cancel" onClick={() => setShowCreateModal(false)}>Cancelar</button>
-                <button
-                  className="btn-primary"
-                  onClick={() => handleAction('create', { ...newUser, provider: 'local' })}
-                  disabled={!newUser.name || !newUser.email}
-                >
+                <button className="btn-primary" onClick={() => handleAction('create', {
+                  name: newUser.name,
+                  email: newUser.email,
+                  role: newUser.role,
+                  password: newUser.password,
+                  provider: newUser.provider,
+                })}>
                   Criar Usuário
                 </button>
               </div>
@@ -293,6 +333,30 @@ export default function UsuariosPage() {
                 <input type="email" value={editingUser.email} disabled className="disabled" />
               </div>
               <div className="form-group">
+                <label>Tipo de Login</label>
+                <select
+                  value={editProvider}
+                  onChange={e => setEditProvider(e.target.value as 'local' | 'google')}
+                >
+                  <option value="local">Local (email + senha)</option>
+                  <option value="google">Google SSO</option>
+                </select>
+                <small className="form-hint">
+                  {editProvider === 'local' ? 'Usuário faz login com email e senha' : 'Usuário faz login com conta Google'}
+                </small>
+              </div>
+              {editProvider === 'local' && (
+                <div className="form-group">
+                  <label>Nova Senha {editingUser.provider === 'local' ? '(deixe vazio para manter)' : '(obrigatório para login local)'}</label>
+                  <input
+                    type="password"
+                    value={editPassword}
+                    onChange={e => setEditPassword(e.target.value)}
+                    placeholder="Nova senha"
+                  />
+                </div>
+              )}
+              <div className="form-group">
                 <label>Perfil de Acesso</label>
                 <select
                   value={editingUser.roleId || editingUser.role}
@@ -305,10 +369,7 @@ export default function UsuariosPage() {
               </div>
               <div className="modal-actions">
                 <button className="btn-cancel" onClick={() => setEditingUser(null)}>Cancelar</button>
-                <button
-                  className="btn-primary"
-                  onClick={() => handleAction('update', { id: editingUser.id, name: editingUser.name, role: editingUser.roleId || editingUser.role })}
-                >
+                <button className="btn-primary" onClick={handleSaveEdit}>
                   Salvar Alterações
                 </button>
               </div>

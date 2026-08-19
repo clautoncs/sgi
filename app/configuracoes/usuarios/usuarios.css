@@ -308,3 +308,17 @@
 }
 
 .btn-cancel:hover { border-color: #475569; color: #e2e8f0; }
+
+/* Form hint */
+.form-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.3rem;
+  font-style: italic;
+}
+
+.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

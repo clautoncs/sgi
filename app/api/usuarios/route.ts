@@ -111,12 +111,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "update") {
-      const { id, name, role: roleId } = userData;
+      const { id, name, role: roleId, password, provider } = userData;
       if (!id) {
         return NextResponse.json({ error: "ID do usuário é obrigatório" }, { status: 400 });
       }
       const updateData: any = {};
       if (name) updateData.name = name;
+      if (provider) updateData.provider = provider;
+      if (password && password.trim()) {
+        updateData.password = await hash(password, 12);
+      }
       if (roleId) {
         let targetRole = await prisma.role.findFirst({ where: { id: roleId } });
         if (!targetRole) {
@@ -137,6 +141,7 @@ export async function POST(request: NextRequest) {
           email: user.email,
           role: user.role.label,
           roleId: user.roleId,
+          provider: user.provider,
         },
       });
     }

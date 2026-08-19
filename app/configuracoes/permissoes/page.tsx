@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import './permissoes.css';
 
 interface Permission {
@@ -18,7 +17,6 @@ interface Role {
   isSystem: boolean;
   estoqueProfile: string;
   permissions: Permission[];
-  createdAt: string;
 }
 
 interface PageDef {
@@ -27,624 +25,255 @@ interface PageDef {
   module: string;
 }
 
-interface EstoqueProfile {
-  code: string;
-  label: string;
-  description: string;
-}
-
 interface RolesDB {
   defaultRole: string;
   defaultEstoqueProfile: string;
   pages: PageDef[];
-  estoqueProfiles: EstoqueProfile[];
+  estoqueProfiles: { code: string; label: string; description: string }[];
   roles: Role[];
 }
 
 export default function PermissoesPage() {
   const [db, setDb] = useState<RolesDB | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPageModal, setShowPageModal] = useState(false);
-  const [newRole, setNewRole] = useState({ name: '', label: '', description: '', estoqueProfile: 'varejo' });
-  const [newPage, setNewPage] = useState({ code: '', label: '', module: '' });
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [newRole, setNewRole] = useState({ label: '', description: '', estoqueProfile: 'varejo' });
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/permissoes');
       const data: RolesDB = await res.json();
       setDb(data);
-      if (!selectedRole && data.roles?.length > 0) {
-        setSelectedRole(data.roles[0]);
-      } else if (selectedRole) {
-        const updated = data.roles.find(r => r.id === selectedRole.id);
-        if (updated) setSelectedRole(updated);
-      }
-    } catch (err) {
-      console.error('Erro:', err);
-    } finally {
-      setLoading(false);
-    }
+      if (!selectedRoleId && data.roles?.length > 0) setSelectedRoleId(data.roles[0].id);
+    } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleToggle = (pageCode: string, level: 'view' | 'edit' | 'manage') => {
-    if (!selectedRole) return;
-    const updated = { ...selectedRole, permissions: [...selectedRole.permissions] };
-    const permIdx = updated.permissions.findIndex(p => p.page === pageCode);
-    if (permIdx === -1) return;
-    const perm = { ...updated.permissions[permIdx] };
-    updated.permissions[permIdx] = perm;
+  const selectedRole = db?.roles.find(r => r.id === selectedRoleId) || null;
 
-    if (level === 'manage') {
-      perm.manage = !perm.manage;
-      if (perm.manage) { perm.edit = true; perm.view = true; }
-    } else if (level === 'edit') {
-      perm.edit = !perm.edit;
-      if (perm.edit) { perm.view = true; }
-      if (!perm.edit) { perm.manage = false; }
-    } else {
-      perm.view = !perm.view;
-      if (!perm.view) { perm.edit = false; perm.manage = false; }
-    }
-    setSelectedRole(updated);
+  const handleToggle = (pageCode: string, level: 'view' | 'edit' | 'manage') => {
+    if (!db || !selectedRole) return;
+    const updatedRoles = db.roles.map(r => {
+      if (r.id !== selectedRole.id) return r;
+      const perms = r.permissions.map(p => {
+        if (p.page !== pageCode) return p;
+        return { ...p, [level]: !p[level] };
+      });
+      return { ...r, permissions: perms };
+    });
+    setDb({ ...db, roles: updatedRoles });
   };
 
-  const handleEstoqueProfileChange = (profile: string) => {
-    if (!selectedRole) return;
-    setSelectedRole({ ...selectedRole, estoqueProfile: profile });
+  const handleEstoqueChange = (profile: string) => {
+    if (!db || !selectedRole) return;
+    const updatedRoles = db.roles.map(r => r.id === selectedRole.id ? { ...r, estoqueProfile: profile } : r);
+    setDb({ ...db, roles: updatedRoles });
+  };
+
+  const handleDefaultChange = (field: string, value: string) => {
+    if (!db) return;
+    setDb({ ...db, [field]: value });
   };
 
   const handleSave = async () => {
-    if (!selectedRole) return;
+    if (!db) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/permissoes', {
+      await fetch('/api/permissoes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_role',
-          id: selectedRole.id,
-          permissions: selectedRole.permissions,
-          estoqueProfile: selectedRole.estoqueProfile,
-        }),
+        body: JSON.stringify(db),
       });
-      const result = await res.json();
-      if (result.success) {
-        showToast('Permissões salvas com sucesso!');
-        fetchData();
-      } else {
-        alert(result.error || 'Erro ao salvar');
-      }
-    } catch {
-      alert('Erro de conexão');
-    } finally {
-      setSaving(false);
-    }
+      showToast('Permissões salvas com sucesso!');
+      fetchData();
+    } catch { showToast('Erro ao salvar'); } finally { setSaving(false); }
   };
 
   const handleCreateRole = async () => {
-    try {
-      const res = await fetch('/api/permissoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create_role', ...newRole }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        showToast('Perfil criado com sucesso!');
-        fetchData();
-        setShowCreateModal(false);
-        setNewRole({ name: '', label: '', description: '', estoqueProfile: 'varejo' });
-        setSelectedRole(result.role);
-      } else {
-        alert(result.error);
-      }
-    } catch {
-      alert('Erro de conexão');
-    }
+    if (!db || !newRole.label) return;
+    const id = 'role_' + newRole.label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const name = newRole.label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const permissions = db.pages.map(p => ({ page: p.code, view: false, edit: false, manage: false }));
+    const role: Role = { id, name, label: newRole.label, description: newRole.description, isSystem: false, estoqueProfile: newRole.estoqueProfile, permissions };
+    const updated = { ...db, roles: [...db.roles, role] };
+    setDb(updated);
+    setSelectedRoleId(id);
+    setShowCreate(false);
+    setNewRole({ label: '', description: '', estoqueProfile: 'varejo' });
+    // Salvar imediatamente
+    await fetch('/api/permissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+    showToast(`Perfil "${role.label}" criado!`);
+    fetchData();
   };
 
-  const handleDeleteRole = async (roleId: string) => {
-    if (!confirm('Excluir este perfil? Usuários associados perderão acesso.')) return;
-    try {
-      const res = await fetch('/api/permissoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_role', id: roleId }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        setSelectedRole(null);
-        showToast('Perfil excluído');
-        fetchData();
-      } else {
-        alert(result.error);
-      }
-    } catch {
-      alert('Erro de conexão');
-    }
+  const handleDeleteRole = async () => {
+    if (!db || !selectedRole || selectedRole.isSystem) return;
+    if (!confirm(`Excluir o perfil "${selectedRole.label}"?`)) return;
+    const updated = { ...db, roles: db.roles.filter(r => r.id !== selectedRole.id) };
+    setDb(updated);
+    setSelectedRoleId(updated.roles[0]?.id || '');
+    await fetch('/api/permissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+    showToast('Perfil excluído');
+    fetchData();
   };
 
-  const handleUpdateDefaults = async (field: string, value: string) => {
-    try {
-      const res = await fetch('/api/permissoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_defaults', [field]: value }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        showToast('Configuração padrão atualizada!');
-        fetchData();
-      }
-    } catch {
-      alert('Erro de conexão');
-    }
-  };
+  if (loading) return <div className="perm-loading"><div className="spinner" /><p>Carregando...</p></div>;
+  if (!db) return <div className="perm-loading"><p>Erro ao carregar dados</p></div>;
 
-  const handleAddPage = async () => {
-    if (!newPage.code || !newPage.label || !newPage.module) return;
-    try {
-      const res = await fetch('/api/permissoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'add_page', ...newPage }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        showToast('Página adicionada!');
-        setShowPageModal(false);
-        setNewPage({ code: '', label: '', module: '' });
-        fetchData();
-      } else {
-        alert(result.error);
-      }
-    } catch {
-      alert('Erro de conexão');
-    }
-  };
-
-  const handleRemovePage = async (code: string) => {
-    if (!confirm(`Remover a página "${code}" de todos os perfis?`)) return;
-    try {
-      const res = await fetch('/api/permissoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove_page', code }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        showToast('Página removida');
-        fetchData();
-      }
-    } catch {
-      alert('Erro de conexão');
-    }
-  };
-
-  const handleToggleAll = (module: string, level: 'view' | 'edit' | 'manage', enable: boolean) => {
-    if (!selectedRole || !db) return;
-    const moduleCodes = db.pages.filter(p => p.module === module).map(p => p.code);
-    const updated = { ...selectedRole, permissions: [...selectedRole.permissions] };
-    for (let i = 0; i < updated.permissions.length; i++) {
-      if (moduleCodes.includes(updated.permissions[i].page)) {
-        const perm = { ...updated.permissions[i] };
-        if (level === 'manage') {
-          perm.manage = enable;
-          if (enable) { perm.edit = true; perm.view = true; }
-        } else if (level === 'edit') {
-          perm.edit = enable;
-          if (enable) { perm.view = true; }
-          if (!enable) { perm.manage = false; }
-        } else {
-          perm.view = enable;
-          if (!enable) { perm.edit = false; perm.manage = false; }
-        }
-        updated.permissions[i] = perm;
-      }
-    }
-    setSelectedRole(updated);
-  };
-
-  // Agrupar páginas por módulo
-  const groupedPages = db?.pages.reduce((acc, p) => {
-    if (!acc[p.module]) acc[p.module] = [];
-    acc[p.module].push(p);
-    return acc;
-  }, {} as Record<string, PageDef[]>) || {};
-
-  if (loading || !db) {
-    return (
-      <div className="permissoes-loading">
-        <div className="spinner" />
-        <p>Carregando permissões...</p>
-      </div>
-    );
-  }
+  const modules = [...new Set(db.pages.map(p => p.module))];
 
   return (
-    <div className="permissoes-page">
-      {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            className="toast-notification"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="perm-page">
+      {toast && <div className="perm-toast">{toast}</div>}
 
-      <div className="page-header">
+      {/* Header */}
+      <div className="perm-header">
         <div>
-          <h1>Perfis e Permissões</h1>
-          <p className="page-subtitle">Configure o acesso de cada perfil às páginas e funcionalidades do sistema</p>
+          <h1>Permissões</h1>
+          <p className="perm-subtitle">{db.roles.length} perfis configurados</p>
         </div>
-        <div className="header-actions">
-          <button className="btn-secondary" onClick={() => setShowPageModal(true)}>
-            + Página
-          </button>
-          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-            + Novo Perfil
+        <div className="perm-header-actions">
+          <button className="btn-create" onClick={() => setShowCreate(true)}>+ Novo Perfil</button>
+          <button className="btn-save" onClick={handleSave} disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
 
-      {/* Configurações Padrão */}
-      <div className="defaults-section">
-        <h3>Configurações Padrão para Novos Usuários</h3>
-        <div className="defaults-grid">
-          <div className="default-item">
-            <label>Perfil padrão:</label>
-            <select
-              value={db.defaultRole}
-              onChange={(e) => handleUpdateDefaults('defaultRole', e.target.value)}
-            >
-              {db.roles.map(r => (
-                <option key={r.id} value={r.id}>{r.label}</option>
-              ))}
+      {/* Configuração Padrão */}
+      <div className="perm-defaults">
+        <h3>Padrão para Novos Usuários</h3>
+        <div className="perm-defaults-row">
+          <div className="perm-field">
+            <label>Perfil padrão</label>
+            <select value={db.defaultRole} onChange={e => handleDefaultChange('defaultRole', e.target.value)}>
+              {db.roles.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
           </div>
-          <div className="default-item">
-            <label>Perfil de estoque padrão:</label>
-            <select
-              value={db.defaultEstoqueProfile}
-              onChange={(e) => handleUpdateDefaults('defaultEstoqueProfile', e.target.value)}
-            >
-              {db.estoqueProfiles.map(ep => (
-                <option key={ep.code} value={ep.code}>{ep.label}</option>
-              ))}
+          <div className="perm-field">
+            <label>Estoque padrão</label>
+            <select value={db.defaultEstoqueProfile} onChange={e => handleDefaultChange('defaultEstoqueProfile', e.target.value)}>
+              {db.estoqueProfiles.map(p => <option key={p.code} value={p.code}>{p.label}</option>)}
             </select>
           </div>
         </div>
       </div>
 
-      <div className="permissoes-layout">
-        {/* Sidebar de Perfis */}
-        <div className="roles-sidebar">
-          <h3>Perfis</h3>
-          {db.roles.map(role => (
-            <motion.div
-              key={role.id}
-              className={`role-item ${selectedRole?.id === role.id ? 'active' : ''}`}
-              onClick={() => setSelectedRole(role)}
-              whileHover={{ x: 4 }}
-            >
-              <div className="role-item-info">
-                <span className="role-item-label">{role.label}</span>
-                <span className="role-item-desc">{role.description}</span>
-                <span className="role-estoque-badge">{
-                  db.estoqueProfiles.find(ep => ep.code === role.estoqueProfile)?.label || role.estoqueProfile
-                }</span>
-              </div>
-              {role.isSystem && <span className="system-badge">Sistema</span>}
-              {!role.isSystem && (
-                <button
-                  className="role-delete-btn"
-                  onClick={e => { e.stopPropagation(); handleDeleteRole(role.id); }}
-                >
-                  ✕
-                </button>
-              )}
-            </motion.div>
-          ))}
-        </div>
+      {/* Seletor de Perfil */}
+      <div className="perm-roles-tabs">
+        {db.roles.map(r => (
+          <button
+            key={r.id}
+            className={`perm-role-tab ${selectedRoleId === r.id ? 'active' : ''}`}
+            onClick={() => setSelectedRoleId(r.id)}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Configurador de Permissões */}
-        <div className="permissions-editor">
-          {selectedRole ? (
-            <>
-              <div className="editor-header">
-                <div>
-                  <h2>{selectedRole.label}</h2>
-                  <p className="editor-desc">{selectedRole.description}</p>
-                </div>
-                <button
-                  className="btn-save"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? 'Salvando...' : 'Salvar Alterações'}
-                </button>
-              </div>
+      {/* Detalhes do Perfil Selecionado */}
+      {selectedRole && (
+        <div className="perm-detail">
+          <div className="perm-detail-header">
+            <div>
+              <h2>{selectedRole.label}</h2>
+              <p className="perm-desc">{selectedRole.description}</p>
+            </div>
+            {!selectedRole.isSystem && (
+              <button className="btn-delete" onClick={handleDeleteRole}>Excluir Perfil</button>
+            )}
+          </div>
 
-              {/* Perfil de Estoque */}
-              <div className="estoque-profile-section">
-                <h3>Perfil de Visualização do Estoque</h3>
-                <p className="section-desc">Define quais informações de preço este perfil pode ver no catálogo</p>
-                <div className="estoque-profiles-grid">
-                  {db.estoqueProfiles.map(ep => (
-                    <motion.div
-                      key={ep.code}
-                      className={`estoque-profile-card ${selectedRole.estoqueProfile === ep.code ? 'active' : ''}`}
-                      onClick={() => handleEstoqueProfileChange(ep.code)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className="ep-radio">
-                        <div className={`ep-radio-dot ${selectedRole.estoqueProfile === ep.code ? 'checked' : ''}`} />
-                      </div>
-                      <div className="ep-info">
-                        <span className="ep-label">{ep.label}</span>
-                        <span className="ep-desc">{ep.description}</span>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
+          {/* Perfil de Estoque */}
+          <div className="perm-estoque-section">
+            <h3>Visualização do Estoque</h3>
+            <div className="perm-estoque-options">
+              {db.estoqueProfiles.map(p => (
+                <label key={p.code} className={`perm-estoque-option ${selectedRole.estoqueProfile === p.code ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="estoque"
+                    checked={selectedRole.estoqueProfile === p.code}
+                    onChange={() => handleEstoqueChange(p.code)}
+                  />
+                  <div>
+                    <strong>{p.label}</strong>
+                    <span>{p.description}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
 
-              {/* Permissões por Módulo */}
-              <div className="permissions-table">
-                <div className="permissions-header-row">
-                  <span className="col-page">Página</span>
-                  <span className="col-perm">Visualizar</span>
-                  <span className="col-perm">Editar</span>
-                  <span className="col-perm">Gerenciar</span>
-                  <span className="col-action"></span>
-                </div>
-
-                {Object.entries(groupedPages).map(([module, modulePages]) => (
-                  <div key={module} className="permission-module">
-                    <div className="module-header">
-                      <span className="module-name">{module}</span>
-                      <div className="module-toggles">
-                        <button
-                          className="module-toggle-btn"
-                          onClick={() => handleToggleAll(module, 'view', true)}
-                          title="Ativar todas visualizações"
-                        >
-                          Todos ✓
-                        </button>
-                        <button
-                          className="module-toggle-btn off"
-                          onClick={() => handleToggleAll(module, 'view', false)}
-                          title="Desativar todas"
-                        >
-                          Nenhum ✕
-                        </button>
-                      </div>
-                    </div>
-                    {modulePages.map(page => {
-                      const perm = selectedRole.permissions.find(p => p.page === page.code);
+          {/* Tabela de Permissões */}
+          <div className="perm-table-wrap">
+            <table className="perm-table">
+              <thead>
+                <tr>
+                  <th>Página</th>
+                  <th>Ver</th>
+                  <th>Editar</th>
+                  <th>Gerenciar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modules.map(mod => (
+                  <>
+                    <tr key={mod} className="perm-module-row">
+                      <td colSpan={4}>{mod === 'dashboard' ? 'Dashboard' : mod === 'estoque' ? 'Estoque' : mod === 'config' ? 'Configurações' : 'Administração'}</td>
+                    </tr>
+                    {db.pages.filter(p => p.module === mod).map(page => {
+                      const perm = selectedRole.permissions.find(p2 => p2.page === page.code);
                       return (
-                        <motion.div
-                          key={page.code}
-                          className="permission-row"
-                          whileHover={{ backgroundColor: 'rgba(30, 41, 59, 0.5)' }}
-                        >
-                          <span className="col-page">{page.label}</span>
-                          <span className="col-perm">
-                            <label className="toggle">
-                              <input
-                                type="checkbox"
-                                checked={perm?.view || false}
-                                onChange={() => handleToggle(page.code, 'view')}
-                              />
-                              <span className="toggle-slider view" />
-                            </label>
-                          </span>
-                          <span className="col-perm">
-                            <label className="toggle">
-                              <input
-                                type="checkbox"
-                                checked={perm?.edit || false}
-                                onChange={() => handleToggle(page.code, 'edit')}
-                              />
-                              <span className="toggle-slider edit" />
-                            </label>
-                          </span>
-                          <span className="col-perm">
-                            <label className="toggle">
-                              <input
-                                type="checkbox"
-                                checked={perm?.manage || false}
-                                onChange={() => handleToggle(page.code, 'manage')}
-                              />
-                              <span className="toggle-slider manage" />
-                            </label>
-                          </span>
-                          <span className="col-action">
-                            {!['dashboard.painel', 'dashboard.vendas', 'estoque.catalogo', 'admin.usuarios', 'admin.permissoes'].includes(page.code) && (
-                              <button
-                                className="page-remove-btn"
-                                onClick={() => handleRemovePage(page.code)}
-                                title="Remover página"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </span>
-                        </motion.div>
+                        <tr key={page.code}>
+                          <td className="perm-page-name">{page.label}</td>
+                          <td><input type="checkbox" checked={perm?.view || false} onChange={() => handleToggle(page.code, 'view')} /></td>
+                          <td><input type="checkbox" checked={perm?.edit || false} onChange={() => handleToggle(page.code, 'edit')} /></td>
+                          <td><input type="checkbox" checked={perm?.manage || false} onChange={() => handleToggle(page.code, 'manage')} /></td>
+                        </tr>
                       );
                     })}
-                  </div>
+                  </>
                 ))}
-              </div>
-
-              <div className="permissions-legend">
-                <span><strong>Visualizar:</strong> Pode ver a página</span>
-                <span><strong>Editar:</strong> Pode modificar dados</span>
-                <span><strong>Gerenciar:</strong> Controle total (aprovar pedidos, excluir, etc.)</span>
-              </div>
-            </>
-          ) : (
-            <div className="no-selection">
-              <p>Selecione um perfil para configurar suas permissões</p>
-            </div>
-          )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal Criar Perfil */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowCreateModal(false)}
-          >
-            <motion.div
-              className="modal-content"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <h2>Novo Perfil de Acesso</h2>
-              <div className="form-group">
-                <label>Identificador (slug)</label>
-                <input
-                  type="text"
-                  value={newRole.name}
-                  onChange={e => setNewRole({ ...newRole, name: e.target.value.toLowerCase().replace(/\s/g, '_') })}
-                  placeholder="ex: supervisor"
-                />
-              </div>
-              <div className="form-group">
-                <label>Nome de Exibição</label>
-                <input
-                  type="text"
-                  value={newRole.label}
-                  onChange={e => setNewRole({ ...newRole, label: e.target.value })}
-                  placeholder="ex: Supervisor de Vendas"
-                />
-              </div>
-              <div className="form-group">
-                <label>Descrição</label>
-                <input
-                  type="text"
-                  value={newRole.description}
-                  onChange={e => setNewRole({ ...newRole, description: e.target.value })}
-                  placeholder="Breve descrição do perfil"
-                />
-              </div>
-              <div className="form-group">
-                <label>Perfil de Estoque</label>
-                <select
-                  value={newRole.estoqueProfile}
-                  onChange={e => setNewRole({ ...newRole, estoqueProfile: e.target.value })}
-                >
-                  {db.estoqueProfiles.map(ep => (
-                    <option key={ep.code} value={ep.code}>{ep.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button className="btn-cancel" onClick={() => setShowCreateModal(false)}>Cancelar</button>
-                <button
-                  className="btn-primary"
-                  onClick={handleCreateRole}
-                  disabled={!newRole.name || !newRole.label}
-                >
-                  Criar Perfil
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal Adicionar Página */}
-      <AnimatePresence>
-        {showPageModal && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowPageModal(false)}
-          >
-            <motion.div
-              className="modal-content"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <h2>Adicionar Nova Página ao Sistema</h2>
-              <p className="modal-desc">Adicione uma nova página/funcionalidade para controlar permissões</p>
-              <div className="form-group">
-                <label>Código (identificador único)</label>
-                <input
-                  type="text"
-                  value={newPage.code}
-                  onChange={e => setNewPage({ ...newPage, code: e.target.value.toLowerCase().replace(/\s/g, '.') })}
-                  placeholder="ex: relatorios.comissoes"
-                />
-              </div>
-              <div className="form-group">
-                <label>Nome de Exibição</label>
-                <input
-                  type="text"
-                  value={newPage.label}
-                  onChange={e => setNewPage({ ...newPage, label: e.target.value })}
-                  placeholder="ex: Relatório de Comissões"
-                />
-              </div>
-              <div className="form-group">
-                <label>Módulo</label>
-                <input
-                  type="text"
-                  value={newPage.module}
-                  onChange={e => setNewPage({ ...newPage, module: e.target.value })}
-                  placeholder="ex: Relatórios"
-                  list="modules-list"
-                />
-                <datalist id="modules-list">
-                  {Object.keys(groupedPages).map(m => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="modal-actions">
-                <button className="btn-cancel" onClick={() => setShowPageModal(false)}>Cancelar</button>
-                <button
-                  className="btn-primary"
-                  onClick={handleAddPage}
-                  disabled={!newPage.code || !newPage.label || !newPage.module}
-                >
-                  Adicionar Página
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showCreate && (
+        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Novo Perfil</h2>
+            <div className="form-group">
+              <label>Nome do Perfil</label>
+              <input type="text" value={newRole.label} onChange={e => setNewRole({ ...newRole, label: e.target.value })} placeholder="Ex: Revendedor" />
+            </div>
+            <div className="form-group">
+              <label>Descrição</label>
+              <input type="text" value={newRole.description} onChange={e => setNewRole({ ...newRole, description: e.target.value })} placeholder="Ex: Acesso ao catálogo com preço de revenda" />
+            </div>
+            <div className="form-group">
+              <label>Perfil de Estoque</label>
+              <select value={newRole.estoqueProfile} onChange={e => setNewRole({ ...newRole, estoqueProfile: e.target.value })}>
+                {db.estoqueProfiles.map(p => <option key={p.code} value={p.code}>{p.label}</option>)}
+              </select>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowCreate(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={handleCreateRole}>Criar Perfil</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

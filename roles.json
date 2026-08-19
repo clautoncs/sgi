@@ -325,6 +325,71 @@
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
+    },
+    {
+      "id": "role_reseller",
+      "name": "reseller",
+      "label": "Revendedor",
+      "description": "Acesso ao catálogo de estoque com preço de atacado + varejo",
+      "isSystem": true,
+      "estoqueProfile": "atacado",
+      "permissions": [
+        {
+          "page": "dashboard.painel",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.vendas",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.catalogo",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.pedidos",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "estoque.carrinho",
+          "view": true,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "config.metas",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "config.integracoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.usuarios",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        }
+      ],
+      "createdAt": "2026-08-14T00:00:00.000Z"
     }
   ]
 }
