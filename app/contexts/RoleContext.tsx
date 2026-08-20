@@ -1,6 +1,6 @@
-'use client';
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useSession } from 'next-auth/react';
+"use client";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { useSession } from "next-auth/react";
 
 interface Permission {
   page: string;
@@ -21,16 +21,16 @@ interface RoleContextType {
   activeRole: RoleData | null;
   realRole: string;
   allRoles: RoleData[];
-  hasPermission: (page: string, level?: 'view' | 'edit' | 'manage') => boolean;
+  hasPermission: (page: string, level?: "view" | "edit" | "manage") => boolean;
   estoqueProfile: string;
 }
 
 const RoleContext = createContext<RoleContextType>({
   activeRole: null,
-  realRole: '',
+  realRole: "",
   allRoles: [],
   hasPermission: () => false,
-  estoqueProfile: 'varejo',
+  estoqueProfile: "varejo",
 });
 
 export function useRole() {
@@ -40,20 +40,20 @@ export function useRole() {
 export function RoleProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
   const user = session?.user as any;
-  const realRole = user?.role || '';
+  const realRole = user?.role || "";
 
   const [allRoles, setAllRoles] = useState<RoleData[]>([]);
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch('\/api\/permissoes');
+      const res = await fetch("/api/permissoes");
       const data = await res.json();
       if (data.roles) {
         setAllRoles(data.roles.map((r: any) => ({
           id: r.id,
           name: r.name,
           label: r.label,
-          estoqueProfile: r.estoqueProfile || 'varejo',
+          estoqueProfile: r.estoqueProfile || "varejo",
           permissions: r.permissions || [],
         })));
       }
@@ -64,15 +64,15 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
   const activeRole = allRoles.find(r => r.name === realRole) || null;
 
-  const hasPermission = useCallback((page: string, level: 'view' | 'edit' | 'manage' = 'view') => {
-    if (realRole === 'sysadmin' || realRole === 'admin') return true;
+  const hasPermission = useCallback((page: string, level: "view" | "edit" | "manage" = "view") => {
+    if (realRole === "sysadmin" || realRole === "admin") return true;
     if (!activeRole) return false;
     const perm = activeRole.permissions.find(p => p.page === page);
     if (!perm) return false;
     return perm[level];
   }, [activeRole, realRole]);
 
-  const estoqueProfile = activeRole?.estoqueProfile || 'varejo';
+  const estoqueProfile = activeRole?.estoqueProfile || "varejo";
 
   return (
     <RoleContext.Provider value={{

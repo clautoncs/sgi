@@ -332,7 +332,7 @@
       "label": "Revendedor",
       "description": "Acesso ao catálogo de estoque com preço de atacado + varejo",
       "isSystem": true,
-      "estoqueProfile": "atacado",
+      "estoqueProfile": "revenda",
       "permissions": [
         {
           "page": "dashboard.painel",
