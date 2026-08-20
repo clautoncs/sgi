@@ -1,6 +1,6 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "@/styles/sidebar.css";
 
 export default function DashboardLayout({
@@ -11,10 +11,36 @@ export default function DashboardLayout({
   const { data: session } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
+  const [simulatedRole, setSimulatedRole] = useState<string>('');
+  const [roles, setRoles] = useState<{id: string; name: string; label: string}[]>([]);
   const user = session?.user as any;
+
+  const canSimulate = user?.role === 'sysadmin' || user?.role === 'admin';
+
+  useEffect(() => {
+    if (canSimulate) {
+      fetch('/api/permissoes')
+        .then(r => r.json())
+        .then(data => {
+          if (data.roles) setRoles(data.roles.map((r: any) => ({ id: r.id, name: r.name, label: r.label })));
+        })
+        .catch(() => {});
+    }
+  }, [canSimulate]);
+
+  const activeRole = simulatedRole || user?.role || '';
+  const isSimulating = simulatedRole && simulatedRole !== user?.role;
 
   return (
     <div className="dashboard-container">
+      {/* Banner de simulação */}
+      {isSimulating && (
+        <div className="sim-banner">
+          <span>Simulando perfil: <strong>{roles.find(r => r.name === simulatedRole)?.label || simulatedRole}</strong></span>
+          <button onClick={() => setSimulatedRole('')}>Sair da simulação</button>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "sidebar--open" : "sidebar--closed"}`}>
         <div className="sidebar__header">
@@ -22,7 +48,7 @@ export default function DashboardLayout({
             <span className="sidebar__logo-text">SGI</span>
             <span className="sidebar__logo-dot">.</span>
           </div>
-          {sidebarOpen && <span className="sidebar__version">v0.4.0</span>}
+          {sidebarOpen && <span className="sidebar__version">v0.4.1</span>}
         </div>
 
         <nav className="sidebar__nav">
@@ -90,7 +116,7 @@ export default function DashboardLayout({
             )}
           </div>
 
-          {user?.role === "sysadmin" && (
+          {(user?.role === "sysadmin" || user?.role === "admin") && (
             <div className="nav-section">
               <span className="nav-section__title">Administração</span>
               <a href="/configuracoes/usuarios" className="nav-item">
@@ -113,6 +139,28 @@ export default function DashboardLayout({
         </nav>
 
         <div className="sidebar__footer">
+          {/* Simulador de Perfil */}
+          {canSimulate && sidebarOpen && (
+            <div className="sim-selector">
+              <label className="sim-selector__label">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                Simular Perfil
+              </label>
+              <select
+                className="sim-selector__select"
+                value={simulatedRole}
+                onChange={e => setSimulatedRole(e.target.value)}
+              >
+                <option value="">Meu perfil ({user?.role === 'sysadmin' ? 'SYS ADMIN' : 'Admin'})</option>
+                {roles.map(r => (
+                  <option key={r.name} value={r.name}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             className="sidebar__toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
