@@ -11,5 +11,6 @@ services:
       - /root/google-credentials.json:/app/google-credentials.json:ro
       - /root/pedidos.json:/app/data/pedidos.json
       - /root/taxas.json:/app/taxas.json
+      - /root/shopee-config.json:/app/shopee-config.json
     ports:
       - "127.0.0.1:3000:3000"

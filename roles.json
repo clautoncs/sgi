@@ -127,6 +127,12 @@
           "view": true,
           "edit": true,
           "manage": true
+        },
+        {
+          "page": "dashboard.shopee",
+          "view": true,
+          "edit": true,
+          "manage": true
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -192,6 +198,12 @@
           "view": false,
           "edit": false,
           "manage": false
+        },
+        {
+          "page": "dashboard.shopee",
+          "view": true,
+          "edit": true,
+          "manage": true
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -254,6 +266,12 @@
         },
         {
           "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.shopee",
           "view": false,
           "edit": false,
           "manage": false
@@ -322,6 +340,12 @@
           "view": false,
           "edit": false,
           "manage": false
+        },
+        {
+          "page": "dashboard.shopee",
+          "view": false,
+          "edit": false,
+          "manage": false
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -384,6 +408,12 @@
         },
         {
           "page": "admin.permissoes",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.shopee",
           "view": false,
           "edit": false,
           "manage": false

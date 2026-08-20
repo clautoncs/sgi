@@ -20,6 +20,6 @@ export const config = {
      */
     "/dashboard/:path*",
     "/estoque/:path*",
-    "/configuracoes/:path*",
+    "/configuracoes/:path*", "/shopee/:path*",
   ],
 };

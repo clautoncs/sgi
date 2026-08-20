@@ -1,0 +1,522 @@
+/* === SHOPEE DASHBOARD === */
+.shopee-container {
+  padding: 0;
+}
+
+.shopee-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.shopee-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.shopee-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.shopee-title svg {
+  color: #ee4d2d;
+}
+
+.shopee-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.shopee-status--on {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.shopee-status--off {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Tabs */
+.shopee-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 24px;
+}
+
+.shopee-tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.shopee-tab:hover {
+  color: #ee4d2d;
+}
+
+.shopee-tab--active {
+  color: #ee4d2d;
+  border-bottom-color: #ee4d2d;
+  font-weight: 600;
+}
+
+/* Period filter */
+.shopee-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.period-btn {
+  padding: 6px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn:hover {
+  border-color: #ee4d2d;
+  color: #ee4d2d;
+}
+
+.period-btn--active {
+  background: #ee4d2d;
+  color: #fff;
+  border-color: #ee4d2d;
+}
+
+.period-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.period-custom input {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.period-custom span {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* Overview cards */
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.ov-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border-left: 4px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.ov-card--revenue { border-left-color: #ee4d2d; }
+.ov-card--ticket { border-left-color: #3b82f6; }
+.ov-card--shipping { border-left-color: #f59e0b; }
+.ov-card--tax { border-left-color: #ef4444; }
+.ov-card--commission { border-left-color: #8b5cf6; }
+.ov-card--profit { border-left-color: #22c55e; }
+.ov-card--loss { border-left-color: #dc2626; }
+
+.ov-card__label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.ov-card__value {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.ov-card--profit .ov-card__value { color: #16a34a; }
+.ov-card--loss .ov-card__value { color: #dc2626; }
+
+.ov-card__sub {
+  display: block;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
+/* Overview sections */
+.overview-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.overview-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 16px 0;
+}
+
+/* Daily chart */
+.daily-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 200px;
+  padding: 0 8px;
+  overflow-x: auto;
+}
+
+.daily-bar {
+  flex: 1;
+  min-width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  cursor: pointer;
+}
+
+.daily-bar__fill {
+  width: 100%;
+  max-width: 40px;
+  background: linear-gradient(180deg, #ee4d2d, #ff7849);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s;
+  min-height: 4px;
+}
+
+.daily-bar:hover .daily-bar__fill {
+  background: linear-gradient(180deg, #d63a1e, #ee4d2d);
+}
+
+.daily-bar__label {
+  font-size: 0.65rem;
+  color: #9ca3af;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+/* Table */
+.shopee-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.shopee-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.shopee-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+}
+
+.shopee-table tr:hover td {
+  background: #fef2f2;
+}
+
+.product-name {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-sn {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge--green { background: #dcfce7; color: #16a34a; }
+.badge--red { background: #fee2e2; color: #dc2626; }
+.badge--yellow { background: #fef3c7; color: #d97706; }
+.badge--gray { background: #f3f4f6; color: #6b7280; }
+
+/* Text helpers */
+.text-success { color: #16a34a; font-weight: 600; }
+.text-danger { color: #dc2626; }
+.text-muted { color: #9ca3af; font-style: italic; }
+.text-center { text-align: center; }
+
+/* Config */
+.shopee-config {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.config-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.config-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 500px;
+  margin-top: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #ee4d2d;
+  box-shadow: 0 0 0 3px rgba(238, 77, 45, 0.1);
+}
+
+.config-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.config-status {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.config-status__badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #16a34a;
+}
+
+.config-steps {
+  margin: 16px 0 0 0;
+  padding-left: 20px;
+  line-height: 2;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.config-steps code {
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+.config-steps a {
+  color: #ee4d2d;
+  text-decoration: none;
+}
+
+.config-steps a:hover {
+  text-decoration: underline;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn--primary {
+  background: #ee4d2d;
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: #d63a1e;
+}
+
+.btn--primary:disabled {
+  background: #fca5a5;
+  cursor: not-allowed;
+}
+
+.btn--success {
+  background: #22c55e;
+  color: #fff;
+}
+
+.btn--success:hover {
+  background: #16a34a;
+}
+
+.btn--outline-danger {
+  background: transparent;
+  border: 1px solid #dc2626;
+  color: #dc2626;
+}
+
+.btn--outline-danger:hover {
+  background: #fee2e2;
+}
+
+/* Empty state */
+.shopee-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.shopee-empty svg {
+  margin-bottom: 16px;
+  color: #d1d5db;
+}
+
+.shopee-empty h2 {
+  font-size: 1.2rem;
+  color: #6b7280;
+  margin: 0 0 8px 0;
+}
+
+.shopee-empty p {
+  font-size: 0.9rem;
+  max-width: 400px;
+}
+
+/* Loading */
+.shopee-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px;
+  color: #9ca3af;
+}
+
+.shopee-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f4f6;
+  border-top-color: #ee4d2d;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.shopee-spinner-sm {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #ee4d2d;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .overview-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .shopee-table {
+    font-size: 0.78rem;
+  }
+
+  .shopee-table th,
+  .shopee-table td {
+    padding: 8px;
+  }
+
+  .product-name {
+    max-width: 150px;
+  }
+
+  .daily-chart {
+    height: 150px;
+  }
+}
