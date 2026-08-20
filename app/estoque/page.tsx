@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useRole } from '@/app/contexts/RoleContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import './estoque.css';
 

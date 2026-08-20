@@ -1,8 +1,11 @@
 "use client";
 import { useSession } from "next-auth/react";
+import { useRole } from "@/app/contexts/RoleContext";
 import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
+  const { hasPermission } = useRole();
+  if (!hasPermission("dashboard.painel")) return <div style={{padding: "2rem", color: "#94a3b8", textAlign: "center"}}><h2>Acesso Restrito</h2><p>Você não tem permissão para acessar este painel.</p></div>;
   const { data: session } = useSession();
   const user = session?.user as any;
   const [currentTime, setCurrentTime] = useState("");

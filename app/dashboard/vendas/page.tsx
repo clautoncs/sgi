@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRole } from '@/app/contexts/RoleContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -104,6 +105,8 @@ const sectionVariants: any = {
 };
 
 export default function VendasDashboard() {
+  const { hasPermission } = useRole();
+  if (!hasPermission('dashboard.vendas')) return <div style={{padding: '2rem', color: '#94a3b8', textAlign: 'center'}}><h2>Acesso Restrito</h2><p>Você não tem permissão para acessar o Dashboard de Vendas.</p></div>;
   const [dados, setDados] = useState<DadosVendas | null>(null);
   const [metas, setMetas] = useState<Metas | null>(null);
   const [mesSelecionado, setMesSelecionado] = useState(() => {
