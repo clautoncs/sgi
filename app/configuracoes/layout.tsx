@@ -14,15 +14,7 @@ export default function DashboardLayout({
   const [configOpen, setConfigOpen] = useState(false);
   const user = session?.user as any;
 
-  const {
-    canSimulate,
-    isSimulating,
-    simulatedRole,
-    setSimulatedRole,
-    allRoles,
-    activeRole,
-    hasPermission,
-  } = useRole();
+  const { hasPermission } = useRole();
 
   const showDashboard = hasPermission('dashboard.painel');
   const showVendas = hasPermission('dashboard.vendas');
@@ -35,15 +27,7 @@ export default function DashboardLayout({
   const showAdminSection = showUsuarios || showPermissoes;
 
   return (
-    <div className={`dashboard-container ${isSimulating ? 'simulating' : ''}`}>
-      {/* Banner de simulação */}
-      {isSimulating && (
-        <div className="sim-banner">
-          <span>Simulando perfil: <strong>{activeRole?.label || simulatedRole}</strong></span>
-          <button onClick={() => setSimulatedRole('')}>Sair da simulação</button>
-        </div>
-      )}
-
+    <div className="dashboard-container">
       {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? "sidebar--open" : "sidebar--closed"}`}>
         <div className="sidebar__header">
@@ -51,7 +35,7 @@ export default function DashboardLayout({
             <span className="sidebar__logo-text">SGI</span>
             <span className="sidebar__logo-dot">.</span>
           </div>
-          {sidebarOpen && <span className="sidebar__version">v0.4.1</span>}
+          {sidebarOpen && <span className="sidebar__version">v0.4.2</span>}
         </div>
 
         <nav className="sidebar__nav">
@@ -158,28 +142,6 @@ export default function DashboardLayout({
         </nav>
 
         <div className="sidebar__footer">
-          {/* Simulador de Perfil */}
-          {canSimulate && sidebarOpen && (
-            <div className="sim-selector">
-              <label className="sim-selector__label">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-                Simular Perfil
-              </label>
-              <select
-                className="sim-selector__select"
-                value={simulatedRole}
-                onChange={e => setSimulatedRole(e.target.value)}
-              >
-                <option value="">Meu perfil ({user?.role === 'sysadmin' ? 'SYS ADMIN' : 'Admin'})</option>
-                {allRoles.map(r => (
-                  <option key={r.name} value={r.name}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <button
             className="sidebar__toggle"
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -209,7 +171,7 @@ export default function DashboardLayout({
               </div>
               <div className="topbar__user-info">
                 <span className="topbar__user-name">{user?.name || "Usuário"}</span>
-                <span className="topbar__user-role">{isSimulating ? `${activeRole?.label} (simulado)` : (user?.roleLabel || user?.role || "—")}</span>
+                <span className="topbar__user-role">{user?.roleLabel || user?.role || "—"}</span>
               </div>
             </div>
             <button
