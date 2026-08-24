@@ -184,7 +184,7 @@ async function fetchAllOrderSns(
   config: ShopeeConfig,
   timeFrom: number,
   timeTo: number,
-  status: string
+  status: string | null
 ): Promise<string[]> {
   const orderSns: string[] = [];
   let windowStart = timeFrom;
@@ -199,8 +199,10 @@ async function fetchAllOrderSns(
         time_from: String(windowStart),
         time_to: String(windowEnd),
         page_size: "100",
-        order_status: status,
       };
+      // A Shopee não aceita "ALL" como order_status — omitir o parâmetro
+      // é o jeito de trazer pedidos de todos os status.
+      if (status && status !== "ALL") params.order_status = status;
       if (cursor) params.cursor = cursor;
 
       const data = await shopeeRequest(config, "/api/v2/order/get_order_list", params);
@@ -330,7 +332,7 @@ export async function GET(req: NextRequest) {
 
     const timeFrom = Number(searchParams.get("time_from")) || Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
     const timeTo = Number(searchParams.get("time_to")) || Math.floor(Date.now() / 1000);
-    const status = searchParams.get("status") || "ALL";
+    const status = searchParams.get("status");
 
     const orderSns = await fetchAllOrderSns(config, timeFrom, timeTo, status);
     if (orderSns.length === 0) {
