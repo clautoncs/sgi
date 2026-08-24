@@ -190,6 +190,15 @@ export default function ShopeePage() {
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
+  const handleRefresh = () => {
+    if (activeTab === "orders") fetchOrders();
+    if (activeTab === "products") fetchProducts();
+    if (activeTab === "overview") fetchOrders();
+    if (activeTab === "dashboard") fetchDashboardData();
+  };
+
+  const isRefreshing = loadingData || loadingDashboard;
+
   const handleSaveCredentials = async () => {
     setSaving(true);
     try {
@@ -374,6 +383,20 @@ export default function ShopeePage() {
               <span>até</span>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} />
             </div>
+          )}
+          {(activeTab === "overview" || activeTab === "dashboard" || activeTab === "orders" || activeTab === "products") && (
+            <button
+              className="btn-refresh"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Recarregar dados do período selecionado"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" className={isRefreshing ? "btn-refresh__icon spinning" : "btn-refresh__icon"}>
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <polyline points="21 3 21 9 15 9" />
+              </svg>
+              {isRefreshing ? "Atualizando..." : "Atualizar"}
+            </button>
           )}
         </div>
       )}
