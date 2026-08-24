@@ -135,6 +135,8 @@ Visível apenas no perfil Vendedor, no painel do carrinho:
 | `pedidos.json` | `/root/pedidos.json` | `/app/data/pedidos.json` | Pedidos do sistema |
 | `taxas.json` | `/root/taxas.json` | `/app/taxas.json` | Configuração de impostos e canais |
 | `roles.json` | `./roles.json` | `/app/roles.json` | Perfis e permissões |
+| `shopee-config.json` | `/root/shopee-config.json` | `/app/shopee-config.json` | Credenciais e token OAuth da Shopee |
+| `shopee-costs.json` | `/root/shopee-costs.json` | `/app/shopee-costs.json` | Custo cadastrado por produto (Shopee) |
 
 ---
 

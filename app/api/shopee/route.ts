@@ -28,6 +28,20 @@ async function requireAdmin() {
 }
 
 const CONFIG_PATH = "/app/shopee-config.json";
+const COSTS_PATH = "/app/shopee-costs.json";
+
+function getCosts(): Record<string, number> {
+  try {
+    const raw = fs.readFileSync(COSTS_PATH, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveCosts(costs: Record<string, number>) {
+  fs.writeFileSync(COSTS_PATH, JSON.stringify(costs, null, 2));
+}
 
 interface ShopeeConfig {
   partnerId: number;
@@ -323,15 +337,38 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Custos cadastrados por produto (para cálculo de margem real)
+  if (action === "costs") {
+    return NextResponse.json({ costs: getCosts() });
+  }
+
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
 }
 
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireSession();
   if (denied) return denied;
 
   const body = await req.json();
   const { action } = body;
+
+  if (action === "save_credentials" || action === "disconnect") {
+    const deniedAdmin = await requireAdmin();
+    if (deniedAdmin) return deniedAdmin;
+  }
+
+  // Salvar custo de um produto
+  if (action === "save_cost") {
+    const itemId = String(body.itemId || "");
+    const cost = Number(body.cost);
+    if (!itemId || !Number.isFinite(cost) || cost < 0) {
+      return NextResponse.json({ error: "itemId e cost (>= 0) são obrigatórios" }, { status: 400 });
+    }
+    const costs = getCosts();
+    costs[itemId] = cost;
+    saveCosts(costs);
+    return NextResponse.json({ success: true });
+  }
 
   // Salvar credenciais
   if (action === "save_credentials") {

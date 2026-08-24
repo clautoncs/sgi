@@ -12,5 +12,6 @@ services:
       - /root/pedidos.json:/app/data/pedidos.json
       - /root/taxas.json:/app/taxas.json
       - /root/shopee-config.json:/app/shopee-config.json
+      - /root/shopee-costs.json:/app/shopee-costs.json
     ports:
       - "127.0.0.1:3000:3000"

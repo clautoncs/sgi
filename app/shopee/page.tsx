@@ -45,6 +45,9 @@ export default function ShopeePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [prevOrders, setPrevOrders] = useState<Order[]>([]);
   const [escrowList, setEscrowList] = useState<any[]>([]);
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
+  const [savingCostId, setSavingCostId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
 
@@ -71,6 +74,31 @@ export default function ShopeePage() {
   }, []);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  const fetchCosts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/shopee?action=costs");
+      const data = await res.json();
+      setCosts(data.costs || {});
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { if (status?.connected) fetchCosts(); }, [status?.connected, fetchCosts]);
+
+  const handleSaveCost = async (itemId: string, value: string) => {
+    const cost = Number(value.replace(",", "."));
+    if (!Number.isFinite(cost) || cost < 0) return;
+    setSavingCostId(itemId);
+    try {
+      await fetch("/api/shopee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_cost", itemId, cost }),
+      });
+      setCosts((prev) => ({ ...prev, [itemId]: cost }));
+    } catch { /* ignore */ }
+    finally { setSavingCostId(null); }
+  };
 
   const getTimeRange = useCallback(() => {
     const now = Math.floor(Date.now() / 1000);
@@ -211,24 +239,36 @@ export default function ShopeePage() {
   const totalShipping = orders.reduce((sum, o) => sum + (o.actual_shipping_fee || o.estimated_shipping_fee || 0), 0);
   const totalTax = totalRevenue * tax;
   const shopeeCommission = totalRevenue * 0.20; // 20% padrão Shopee
-  const estimatedCost = totalRevenue * 0.40; // Estimativa de custo (40% - ajustável)
-  const netProfit = totalRevenue - estimatedCost - totalTax - shopeeCommission - totalShipping;
-  const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   const avgTicket = orders.length > 0 ? totalRevenue / orders.length : 0;
 
-  // Agrupar vendas por produto
-  const productSales: Record<string, { name: string; qty: number; revenue: number; cost: number }> = {};
+  // Agrupar vendas por produto e cruzar com o custo cadastrado em /produtos.
+  // Sem custo cadastrado, cai no fallback de 40% (mesma estimativa de antes).
+  const productSales: Record<string, { itemId: string; name: string; qty: number; revenue: number }> = {};
   orders.forEach((order) => {
     (order.item_list || []).forEach((item: any) => {
       const key = String(item.item_id);
       if (!productSales[key]) {
-        productSales[key] = { name: item.item_name || `Produto #${item.item_id}`, qty: 0, revenue: 0, cost: 0 };
+        productSales[key] = { itemId: key, name: item.item_name || `Produto #${item.item_id}`, qty: 0, revenue: 0 };
       }
       productSales[key].qty += item.model_quantity_purchased || 1;
       productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * (item.model_quantity_purchased || 1);
     });
   });
-  const productSalesArr = Object.values(productSales).sort((a, b) => b.revenue - a.revenue);
+  const productSalesArr = Object.values(productSales)
+    .map((p) => {
+      const hasCost = Object.prototype.hasOwnProperty.call(costs, p.itemId);
+      const cost = hasCost ? costs[p.itemId] * p.qty : p.revenue * 0.40;
+      return { ...p, hasCost, cost };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const totalCost = productSalesArr.reduce((sum, p) => sum + p.cost, 0);
+  const productsWithCostCount = productSalesArr.filter((p) => p.hasCost).length;
+  const costCoveragePct = productSalesArr.length > 0 ? (productsWithCostCount / productSalesArr.length) * 100 : 0;
+
+  const netProfit = totalRevenue - totalCost - totalTax - shopeeCommission - totalShipping;
+  const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  const pct = (v: number) => (totalRevenue > 0 ? (v / totalRevenue) * 100 : 0);
 
   // Agrupar vendas por dia
   const dailySales: Record<string, { date: string; revenue: number; orders: number }> = {};
@@ -367,15 +407,22 @@ export default function ShopeePage() {
                 <div className="ov-card ov-card--shipping">
                   <span className="ov-card__label">Frete Total</span>
                   <span className="ov-card__value">{fmt(totalShipping)}</span>
+                  <span className="ov-card__sub">{pct(totalShipping).toFixed(1)}% da receita</span>
                 </div>
                 <div className="ov-card ov-card--tax">
                   <span className="ov-card__label">Impostos ({taxRate}%)</span>
                   <span className="ov-card__value">{fmt(totalTax)}</span>
+                  <span className="ov-card__sub">{pct(totalTax).toFixed(1)}% da receita</span>
                 </div>
                 <div className="ov-card ov-card--commission">
                   <span className="ov-card__label">Comissão Shopee</span>
                   <span className="ov-card__value">{fmt(shopeeCommission)}</span>
                   <span className="ov-card__sub">~20% do faturamento</span>
+                </div>
+                <div className="ov-card ov-card--cost">
+                  <span className="ov-card__label">Custo dos Produtos</span>
+                  <span className="ov-card__value">{fmt(totalCost)}</span>
+                  <span className="ov-card__sub">{pct(totalCost).toFixed(1)}% da receita · {productsWithCostCount}/{productSalesArr.length} produtos com custo cadastrado</span>
                 </div>
                 <div className={`ov-card ${netProfit >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
                   <span className="ov-card__label">Lucro Líquido</span>
@@ -383,6 +430,12 @@ export default function ShopeePage() {
                   <span className="ov-card__sub">Margem: {margin.toFixed(1)}%</span>
                 </div>
               </div>
+
+              {costCoveragePct < 100 && productSalesArr.length > 0 && (
+                <div className="cost-warning">
+                  <strong>{(100 - costCoveragePct).toFixed(0)}% dos produtos vendidos</strong> nesse período ainda não têm custo cadastrado — o lucro acima usa uma estimativa de 40% pra eles. Cadastre o custo na aba "Produtos" pra ver o número real.
+                </div>
+              )}
 
               {/* Vendas por dia */}
               <div className="overview-section">
@@ -422,26 +475,33 @@ export default function ShopeePage() {
                         <th>Produto</th>
                         <th>Qtd</th>
                         <th>Receita</th>
+                        <th>Custo</th>
                         <th>Imposto</th>
                         <th>Comissão</th>
-                        <th>Lucro Est.</th>
+                        <th>Lucro</th>
+                        <th>Margem</th>
                       </tr>
                     </thead>
                     <tbody>
                       {productSalesArr.slice(0, 20).map((p, i) => {
                         const pTax = p.revenue * tax;
                         const pComm = p.revenue * 0.20;
-                        const pCost = p.revenue * 0.40;
-                        const pProfit = p.revenue - pCost - pTax - pComm;
+                        const pProfit = p.revenue - p.cost - pTax - pComm;
+                        const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
                         return (
-                          <tr key={i}>
+                          <tr key={p.itemId}>
                             <td>{i + 1}</td>
                             <td className="product-name">{p.name}</td>
                             <td>{p.qty}</td>
                             <td>{fmt(p.revenue)}</td>
+                            <td>
+                              {fmt(p.cost)}
+                              {!p.hasCost && <span className="badge badge--gray cost-badge">estimado</span>}
+                            </td>
                             <td className="text-danger">{fmt(pTax)}</td>
                             <td className="text-danger">{fmt(pComm)}</td>
                             <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
+                            <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
                           </tr>
                         );
                       })}
@@ -574,28 +634,49 @@ export default function ShopeePage() {
                   <th>Status</th>
                   <th>Preço</th>
                   <th>Estoque</th>
+                  <th>Custo</th>
+                  <th>Margem</th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => (
-                  <tr key={p.item_id}>
-                    <td>{p.item_id}</td>
-                    <td className="product-name">{p.item_name}</td>
-                    <td>
-                      <span className={`badge ${p.item_status === "NORMAL" ? "badge--green" : "badge--gray"}`}>
-                        {p.item_status}
-                      </span>
-                    </td>
-                    <td>
-                      {p.price_info?.[0]
-                        ? fmt(p.price_info[0].current_price || p.price_info[0].original_price || 0)
-                        : "—"}
-                    </td>
-                    <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
-                  </tr>
-                ))}
+                {products.map((p) => {
+                  const key = String(p.item_id);
+                  const price = p.price_info?.[0]?.current_price || p.price_info?.[0]?.original_price || 0;
+                  const draft = costDrafts[key] ?? (costs[key] !== undefined ? String(costs[key]) : "");
+                  const costValue = costs[key];
+                  const priceMargin = costValue !== undefined && price > 0 ? ((price - costValue) / price) * 100 : null;
+                  return (
+                    <tr key={p.item_id}>
+                      <td>{p.item_id}</td>
+                      <td className="product-name">{p.item_name}</td>
+                      <td>
+                        <span className={`badge ${p.item_status === "NORMAL" ? "badge--green" : "badge--gray"}`}>
+                          {p.item_status}
+                        </span>
+                      </td>
+                      <td>{price ? fmt(price) : "—"}</td>
+                      <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
+                      <td>
+                        <input
+                          type="number"
+                          className="cost-input"
+                          min="0"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={draft}
+                          onChange={(e) => setCostDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                          onBlur={(e) => { if (e.target.value !== "") handleSaveCost(key, e.target.value); }}
+                        />
+                        {savingCostId === key && <span className="cost-input__saving">salvando...</span>}
+                      </td>
+                      <td className={priceMargin === null ? "text-muted" : priceMargin >= 0 ? "text-success" : "text-danger"}>
+                        {priceMargin === null ? "—" : `${priceMargin.toFixed(1)}%`}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {products.length === 0 && (
-                  <tr><td colSpan={5} className="text-center text-muted">Nenhum produto encontrado</td></tr>
+                  <tr><td colSpan={7} className="text-center text-muted">Nenhum produto encontrado</td></tr>
                 )}
               </tbody>
             </table>
