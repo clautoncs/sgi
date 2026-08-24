@@ -175,6 +175,79 @@ async function ensureValidToken(config: ShopeeConfig): Promise<ShopeeConfig> {
   return config;
 }
 
+// A Shopee limita get_order_list/get_escrow_list a uma janela de no máximo 15 dias
+// por chamada — por isso quebramos períodos maiores (ex: "mês") em sub-janelas.
+const MAX_TIME_WINDOW = 15 * 24 * 3600;
+const MAX_PAGES = 40; // trava de segurança contra lojas com volume muito alto
+
+async function fetchAllOrderSns(
+  config: ShopeeConfig,
+  timeFrom: number,
+  timeTo: number,
+  status: string
+): Promise<string[]> {
+  const orderSns: string[] = [];
+  let windowStart = timeFrom;
+  let pages = 0;
+
+  while (windowStart < timeTo && pages < MAX_PAGES) {
+    const windowEnd = Math.min(windowStart + MAX_TIME_WINDOW, timeTo);
+    let cursor = "";
+    do {
+      const params: Record<string, string> = {
+        time_range_field: "create_time",
+        time_from: String(windowStart),
+        time_to: String(windowEnd),
+        page_size: "100",
+        order_status: status,
+      };
+      if (cursor) params.cursor = cursor;
+
+      const data = await shopeeRequest(config, "/api/v2/order/get_order_list", params);
+      const list = data.response?.order_list || [];
+      orderSns.push(...list.map((o: any) => o.order_sn));
+      cursor = data.response?.more ? (data.response?.next_cursor || "") : "";
+      pages++;
+    } while (cursor && pages < MAX_PAGES);
+
+    windowStart = windowEnd;
+  }
+
+  return orderSns;
+}
+
+async function fetchAllEscrowList(
+  config: ShopeeConfig,
+  timeFrom: number,
+  timeTo: number
+): Promise<any[]> {
+  const escrowList: any[] = [];
+  let windowStart = timeFrom;
+  let pages = 0;
+
+  while (windowStart < timeTo && pages < MAX_PAGES) {
+    const windowEnd = Math.min(windowStart + MAX_TIME_WINDOW, timeTo);
+    let pageNo = 1;
+    let hasMore = true;
+    while (hasMore && pages < MAX_PAGES) {
+      const data = await shopeeRequest(config, "/api/v2/payment/get_escrow_list", {
+        release_time_from: String(windowStart),
+        release_time_to: String(windowEnd),
+        page_size: "100",
+        page_no: String(pageNo),
+      });
+      const list = data.response?.escrow_list || [];
+      escrowList.push(...list);
+      hasMore = list.length === 100;
+      pageNo++;
+      pages++;
+    }
+    windowStart = windowEnd;
+  }
+
+  return escrowList;
+}
+
 export async function GET(req: NextRequest) {
   const denied = await requireSession();
   if (denied) return denied;
@@ -255,40 +328,28 @@ export async function GET(req: NextRequest) {
     }
     config = await ensureValidToken(config);
 
-    const timeFrom = searchParams.get("time_from") || String(Math.floor(Date.now() / 1000) - 30 * 24 * 3600);
-    const timeTo = searchParams.get("time_to") || String(Math.floor(Date.now() / 1000));
-    const cursor = searchParams.get("cursor") || "";
+    const timeFrom = Number(searchParams.get("time_from")) || Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const timeTo = Number(searchParams.get("time_to")) || Math.floor(Date.now() / 1000);
+    const status = searchParams.get("status") || "ALL";
 
-    const params: Record<string, string> = {
-      time_range_field: "create_time",
-      time_from: timeFrom,
-      time_to: timeTo,
-      page_size: "50",
-      order_status: searchParams.get("status") || "COMPLETED",
-    };
-    if (cursor) params.cursor = cursor;
-
-    const data = await shopeeRequest(config, "/api/v2/order/get_order_list", params);
-
-    if (data.response?.order_list?.length) {
-      const orderIds = data.response.order_list.map((o: any) => o.order_sn).join(",");
-      const details = await shopeeRequest(
-        config,
-        "/api/v2/order/get_order_detail",
-        {
-          order_sn_list: orderIds,
-          response_optional_fields:
-            "buyer_user_id,item_list,pay_time,buyer_username,estimated_shipping_fee,actual_shipping_fee,total_amount,order_chargeable_weight_gram",
-        }
-      );
-      return NextResponse.json({
-        orders: details.response?.order_list || [],
-        total: data.response.total_count || 0,
-        hasMore: data.response.more || false,
-        nextCursor: data.response.next_cursor || "",
-      });
+    const orderSns = await fetchAllOrderSns(config, timeFrom, timeTo, status);
+    if (orderSns.length === 0) {
+      return NextResponse.json({ orders: [], total: 0, hasMore: false });
     }
-    return NextResponse.json({ orders: [], total: 0, hasMore: false });
+
+    // get_order_detail aceita no máximo 50 order_sn por chamada
+    const orders: any[] = [];
+    for (let i = 0; i < orderSns.length; i += 50) {
+      const batch = orderSns.slice(i, i + 50);
+      const details = await shopeeRequest(config, "/api/v2/order/get_order_detail", {
+        order_sn_list: batch.join(","),
+        response_optional_fields:
+          "buyer_user_id,item_list,pay_time,buyer_username,estimated_shipping_fee,actual_shipping_fee,total_amount,order_chargeable_weight_gram",
+      });
+      orders.push(...(details.response?.order_list || []));
+    }
+
+    return NextResponse.json({ orders, total: orders.length, hasMore: false });
   }
 
   // Buscar dados financeiros (escrow)
@@ -299,19 +360,14 @@ export async function GET(req: NextRequest) {
     }
     config = await ensureValidToken(config);
 
-    const releaseTimeFrom = searchParams.get("time_from") || String(Math.floor(Date.now() / 1000) - 30 * 24 * 3600);
-    const releaseTimeTo = searchParams.get("time_to") || String(Math.floor(Date.now() / 1000));
+    const releaseTimeFrom = Number(searchParams.get("time_from")) || Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const releaseTimeTo = Number(searchParams.get("time_to")) || Math.floor(Date.now() / 1000);
 
-    const data = await shopeeRequest(config, "/api/v2/payment/get_escrow_list", {
-      release_time_from: releaseTimeFrom,
-      release_time_to: releaseTimeTo,
-      page_size: "50",
-      page_no: searchParams.get("page") || "1",
-    });
+    const escrowList = await fetchAllEscrowList(config, releaseTimeFrom, releaseTimeTo);
 
     return NextResponse.json({
-      escrowList: data.response?.escrow_list || [],
-      total: data.response?.total_count || 0,
+      escrowList,
+      total: escrowList.length,
     });
   }
 
