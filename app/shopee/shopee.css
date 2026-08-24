@@ -178,6 +178,64 @@
   margin-top: 4px;
 }
 
+/* Growth badge (comparativo com período anterior) */
+.growth-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 6px;
+}
+
+.growth-badge--up { background: #dcfce7; color: #16a34a; }
+.growth-badge--down { background: #fee2e2; color: #dc2626; }
+
+/* Pedidos por status */
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-row__label {
+  width: 160px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.status-row__bar {
+  flex: 1;
+  height: 10px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.status-row__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ee4d2d, #ff7849);
+  border-radius: 6px;
+  transition: width 0.3s;
+}
+
+.status-row__count {
+  width: 90px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
 /* Overview sections */
 .overview-section {
   background: #fff;

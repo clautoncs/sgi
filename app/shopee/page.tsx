@@ -37,13 +37,16 @@ type PeriodFilter = "today" | "week" | "month" | "custom";
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "orders" | "config">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "config">("overview");
   const [period, setPeriod] = useState<PeriodFilter>("month");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [prevOrders, setPrevOrders] = useState<Order[]>([]);
+  const [escrowList, setEscrowList] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
 
   // Config form
   const [partnerId, setPartnerId] = useState("");
@@ -92,6 +95,12 @@ export default function ShopeePage() {
     }
   }, [period, customFrom, customTo]);
 
+  const getPreviousTimeRange = useCallback(() => {
+    const { from, to } = getTimeRange();
+    const span = to - from;
+    return { from: from - span, to: from };
+  }, [getTimeRange]);
+
   const fetchOrders = useCallback(async () => {
     if (!status?.connected) return;
     setLoadingData(true);
@@ -115,10 +124,42 @@ export default function ShopeePage() {
     finally { setLoadingData(false); }
   }, [status]);
 
+  const fetchPreviousOrders = useCallback(async () => {
+    if (!status?.connected) return;
+    try {
+      const { from, to } = getPreviousTimeRange();
+      const res = await fetch(`/api/shopee?action=orders&time_from=${from}&time_to=${to}`);
+      const data = await res.json();
+      setPrevOrders(data.orders || []);
+    } catch { /* ignore */ }
+  }, [status, getPreviousTimeRange]);
+
+  const fetchFinance = useCallback(async () => {
+    if (!status?.connected) return;
+    try {
+      const { from, to } = getTimeRange();
+      const res = await fetch(`/api/shopee?action=finance&time_from=${from}&time_to=${to}`);
+      const data = await res.json();
+      setEscrowList(data.escrowList || []);
+    } catch { /* ignore */ }
+  }, [status, getTimeRange]);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!status?.connected) return;
+    setLoadingDashboard(true);
+    try {
+      await Promise.all([fetchOrders(), fetchProducts(), fetchFinance(), fetchPreviousOrders()]);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [status, fetchOrders, fetchProducts, fetchFinance, fetchPreviousOrders]);
+
   useEffect(() => {
-    if (status?.connected && activeTab === "orders") fetchOrders();
-    if (status?.connected && activeTab === "products") fetchProducts();
-    if (status?.connected && activeTab === "overview") fetchOrders();
+    if (!status?.connected) return;
+    if (activeTab === "orders") fetchOrders();
+    if (activeTab === "products") fetchProducts();
+    if (activeTab === "overview") fetchOrders();
+    if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
   const handleSaveCredentials = async () => {
@@ -200,6 +241,30 @@ export default function ShopeePage() {
   });
   const dailySalesArr = Object.values(dailySales).sort((a, b) => a.date.localeCompare(b.date));
 
+  // Pedidos por status
+  const statusCounts: Record<string, number> = {};
+  orders.forEach((o) => {
+    const s = o.order_status || "DESCONHECIDO";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+  const statusArr = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
+
+  // Comparativo com período anterior (mesma duração, imediatamente antes)
+  const prevRevenue = prevOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const revenueGrowth = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : (totalRevenue > 0 ? 100 : 0);
+  const ordersGrowth = prevOrders.length > 0 ? ((orders.length - prevOrders.length) / prevOrders.length) * 100 : (orders.length > 0 ? 100 : 0);
+
+  // Financeiro real (escrow) - nomes de campo variam conforme versão da API da Shopee, por isso os fallbacks
+  const escrowNet = escrowList.reduce((sum, e) => sum + (e.escrow_amount ?? e.escrow_amount_after_adjustment ?? 0), 0);
+  const escrowGross = escrowList.reduce((sum, e) => sum + (e.buyer_total_amount ?? e.order_income?.buyer_total_amount ?? 0), 0);
+  const escrowFees = escrowGross > escrowNet ? escrowGross - escrowNet : 0;
+
+  // Produtos ativos sem venda no período
+  const soldProductIds = new Set<string>();
+  orders.forEach((o) => (o.item_list || []).forEach((it: any) => soldProductIds.add(String(it.item_id))));
+  const activeProducts = products.filter((p) => p.item_status === "NORMAL");
+  const staleProducts = activeProducts.filter((p) => !soldProductIds.has(String(p.item_id)));
+
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -242,6 +307,9 @@ export default function ShopeePage() {
         <button className={`shopee-tab ${activeTab === "overview" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("overview")}>
           Overview
         </button>
+        <button className={`shopee-tab ${activeTab === "dashboard" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("dashboard")}>
+          Dashboard
+        </button>
         <button className={`shopee-tab ${activeTab === "products" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("products")}>
           Produtos
         </button>
@@ -253,8 +321,8 @@ export default function ShopeePage() {
         </button>
       </div>
 
-      {/* Filtro de período (overview e pedidos) */}
-      {(activeTab === "overview" || activeTab === "orders") && status?.connected && (
+      {/* Filtro de período (geral, vale para todas as abas) */}
+      {status?.connected && (
         <div className="shopee-period">
           <button className={`period-btn ${period === "today" ? "period-btn--active" : ""}`} onClick={() => setPeriod("today")}>Hoje</button>
           <button className={`period-btn ${period === "week" ? "period-btn--active" : ""}`} onClick={() => setPeriod("week")}>Semana</button>
@@ -379,6 +447,108 @@ export default function ShopeePage() {
                       })}
                     </tbody>
                   </table>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* DASHBOARD */}
+      {activeTab === "dashboard" && (
+        <div className="shopee-dashboard">
+          {!status?.connected ? (
+            <div className="shopee-empty">
+              <p>Conecte sua loja para ver o dashboard.</p>
+            </div>
+          ) : loadingDashboard ? (
+            <div className="shopee-spinner" />
+          ) : (
+            <>
+              <div className="overview-cards">
+                <div className="ov-card ov-card--revenue">
+                  <span className="ov-card__label">Receita do Período</span>
+                  <span className="ov-card__value">{fmt(totalRevenue)}</span>
+                  <span className={`growth-badge ${revenueGrowth >= 0 ? "growth-badge--up" : "growth-badge--down"}`}>
+                    {revenueGrowth >= 0 ? "+" : ""}{revenueGrowth.toFixed(1)}% vs período anterior
+                  </span>
+                </div>
+                <div className="ov-card ov-card--ticket">
+                  <span className="ov-card__label">Pedidos</span>
+                  <span className="ov-card__value">{orders.length}</span>
+                  <span className={`growth-badge ${ordersGrowth >= 0 ? "growth-badge--up" : "growth-badge--down"}`}>
+                    {ordersGrowth >= 0 ? "+" : ""}{ordersGrowth.toFixed(1)}% vs período anterior
+                  </span>
+                </div>
+                <div className="ov-card ov-card--profit">
+                  <span className="ov-card__label">Repasse Líquido Shopee</span>
+                  <span className="ov-card__value">{fmt(escrowNet)}</span>
+                  <span className="ov-card__sub">{escrowList.length} pedidos liquidados</span>
+                </div>
+                <div className="ov-card ov-card--tax">
+                  <span className="ov-card__label">Taxas Cobradas (real)</span>
+                  <span className="ov-card__value">{fmt(escrowFees)}</span>
+                  <span className="ov-card__sub">Diferença entre valor bruto e repasse</span>
+                </div>
+              </div>
+
+              <div className="overview-section">
+                <h3>Pedidos por Status</h3>
+                {statusArr.length === 0 ? (
+                  <p className="text-muted">Nenhum pedido no período selecionado.</p>
+                ) : (
+                  <div className="status-list">
+                    {statusArr.map(([statusName, count]) => (
+                      <div className="status-row" key={statusName}>
+                        <span className="status-row__label">{statusName}</span>
+                        <div className="status-row__bar">
+                          <div
+                            className="status-row__fill"
+                            style={{ width: `${orders.length > 0 ? (count / orders.length) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="status-row__count">
+                          {count} ({orders.length > 0 ? ((count / orders.length) * 100).toFixed(0) : 0}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="overview-section">
+                <h3>Produtos Sem Giro no Período</h3>
+                <p className="text-muted" style={{ marginBottom: 12 }}>
+                  {staleProducts.length} de {activeProducts.length} produtos ativos não venderam nada nesse período.
+                </p>
+                {staleProducts.length === 0 ? (
+                  <p className="text-muted">Todos os produtos ativos tiveram venda no período.</p>
+                ) : (
+                  <>
+                    <table className="shopee-table">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Produto</th>
+                          <th>Estoque</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {staleProducts.slice(0, 30).map((p) => (
+                          <tr key={p.item_id}>
+                            <td>{p.item_id}</td>
+                            <td className="product-name">{p.item_name}</td>
+                            <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {staleProducts.length > 30 && (
+                      <p className="text-muted" style={{ marginTop: 8 }}>
+                        + {staleProducts.length - 30} outros produtos sem giro.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </>
