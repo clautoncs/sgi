@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+
+const ADMIN_ROLES = ["sysadmin", "admin"];
+
+async function requireSession() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+  return null;
+}
+
+async function requireAdmin() {
+  const session = await getServerSession(authOptions);
+  const role = (session?.user as any)?.role;
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+  if (!ADMIN_ROLES.includes(role)) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+  return null;
+}
 
 const CONFIG_PATH = "/app/shopee-config.json";
 
@@ -138,6 +162,9 @@ async function ensureValidToken(config: ShopeeConfig): Promise<ShopeeConfig> {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action");
 
@@ -300,6 +327,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   const body = await req.json();
   const { action } = body;
 
