@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import type { ReactNode } from "react";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import "./shopee.css";
 
@@ -35,6 +36,9 @@ interface Order {
 
 type PeriodFilter = "today" | "week" | "month" | "custom";
 
+const DEFAULT_OVERVIEW_ORDER = ["pizza", "summary", "daily", "ranking", "detailed"];
+const OVERVIEW_ORDER_STORAGE_KEY = "shopee-overview-order";
+
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +55,9 @@ export default function ShopeePage() {
   const [savingCostId, setSavingCostId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [overviewOrder, setOverviewOrder] = useState<string[]>(DEFAULT_OVERVIEW_ORDER);
+  const [draggedKey, setDraggedKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
   // Config form
   const [partnerId, setPartnerId] = useState("");
@@ -75,6 +82,41 @@ export default function ShopeePage() {
   }, []);
 
   useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(OVERVIEW_ORDER_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length === DEFAULT_OVERVIEW_ORDER.length &&
+          DEFAULT_OVERVIEW_ORDER.every((k) => parsed.includes(k))
+        ) {
+          setOverviewOrder(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem(OVERVIEW_ORDER_STORAGE_KEY, JSON.stringify(overviewOrder)); } catch { /* ignore */ }
+  }, [overviewOrder]);
+
+  const handleBoxDrop = (targetKey: string) => {
+    setDragOverKey(null);
+    if (!draggedKey || draggedKey === targetKey) { setDraggedKey(null); return; }
+    setOverviewOrder((prev) => {
+      const next = [...prev];
+      const fromIdx = next.indexOf(draggedKey);
+      const toIdx = next.indexOf(targetKey);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, draggedKey);
+      return next;
+    });
+    setDraggedKey(null);
+  };
 
   const fetchCosts = useCallback(async () => {
     try {
@@ -382,6 +424,218 @@ export default function ShopeePage() {
     );
   }
 
+  const DraggableBox = ({ id, children }: { id: string; children: ReactNode }) => (
+    <div
+      className={[
+        "draggable-box",
+        draggedKey === id ? "draggable-box--dragging" : "",
+        dragOverKey === id && draggedKey !== id ? "draggable-box--over" : "",
+      ].filter(Boolean).join(" ")}
+      draggable
+      onDragStart={() => setDraggedKey(id)}
+      onDragEnd={() => { setDraggedKey(null); setDragOverKey(null); }}
+      onDragOver={(e) => { e.preventDefault(); if (dragOverKey !== id) setDragOverKey(id); }}
+      onDrop={(e) => { e.preventDefault(); handleBoxDrop(id); }}
+    >
+      <div className="draggable-box__handle" title="Arraste para reposicionar">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <circle cx="8" cy="5" r="1.6" /><circle cx="16" cy="5" r="1.6" />
+          <circle cx="8" cy="12" r="1.6" /><circle cx="16" cy="12" r="1.6" />
+          <circle cx="8" cy="19" r="1.6" /><circle cx="16" cy="19" r="1.6" />
+        </svg>
+      </div>
+      {children}
+    </div>
+  );
+
+  const overviewSections: Record<string, ReactNode> = {
+    pizza: productSalesArr.length > 0 && (
+      <div className="overview-section">
+        <h3>Vendas por Produto</h3>
+        <ResponsiveContainer width="100%" height={320}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="revenue"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={110}
+              label={(entry: any) => `${totalRevenue > 0 ? ((entry.revenue / totalRevenue) * 100).toFixed(0) : 0}%`}
+            >
+              {pieData.map((_, i) => (
+                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+              ))}
+            </Pie>
+            <RechartsTooltip content={renderPieTooltip} />
+            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "0.78rem" }} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    ),
+    summary: (
+      <div className="overview-summary-box">
+        <div className="overview-cards">
+          <div className="ov-card ov-card--revenue">
+            <span className="ov-card__label">Faturamento</span>
+            <span className="ov-card__value">{fmt(totalRevenue)}</span>
+            <span className="ov-card__sub">{orders.length} pedidos</span>
+          </div>
+          <div className="ov-card ov-card--ticket">
+            <span className="ov-card__label">Ticket Médio</span>
+            <span className="ov-card__value">{fmt(avgTicket)}</span>
+          </div>
+          <div className="ov-card ov-card--shipping">
+            <span className="ov-card__label">Frete Total</span>
+            <span className="ov-card__value">{fmt(totalShipping)}</span>
+            <span className="ov-card__sub">{pct(totalShipping).toFixed(1)}% da receita</span>
+          </div>
+          <div className="ov-card ov-card--tax">
+            <span className="ov-card__label">Impostos ({taxRate}%)</span>
+            <span className="ov-card__value">{fmt(totalTax)}</span>
+            <span className="ov-card__sub">{pct(totalTax).toFixed(1)}% da receita</span>
+          </div>
+          <div className="ov-card ov-card--commission">
+            <span className="ov-card__label">Comissão Shopee</span>
+            <span className="ov-card__value">{fmt(shopeeCommission)}</span>
+            <span className="ov-card__sub">~20% do faturamento</span>
+          </div>
+          <div className="ov-card ov-card--cost">
+            <span className="ov-card__label">Custo dos Produtos</span>
+            <span className="ov-card__value">{fmt(totalCost)}</span>
+            <span className="ov-card__sub">{pct(totalCost).toFixed(1)}% da receita · {productsWithCostCount}/{productSalesArr.length} produtos com custo cadastrado</span>
+          </div>
+          <div className={`ov-card ${netProfit >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
+            <span className="ov-card__label">Lucro Líquido</span>
+            <span className="ov-card__value">{fmt(netProfit)}</span>
+            <span className="ov-card__sub">Margem: {margin.toFixed(1)}%</span>
+          </div>
+        </div>
+
+        {costCoveragePct < 100 && productSalesArr.length > 0 && (
+          <div className="cost-warning">
+            <strong>{(100 - costCoveragePct).toFixed(0)}% dos produtos vendidos</strong> nesse período ainda não têm custo cadastrado — o lucro acima usa uma estimativa de 40% pra eles. Cadastre o custo na aba "Produtos" pra ver o número real.
+          </div>
+        )}
+      </div>
+    ),
+    daily: (
+      <div className="overview-section">
+        <h3>Vendas por Dia</h3>
+        {loadingData ? (
+          <div className="shopee-spinner-sm" />
+        ) : dailySalesArr.length === 0 ? (
+          <p className="text-muted">Nenhuma venda no período selecionado.</p>
+        ) : (
+          <div className="daily-chart">
+            {dailySalesArr.map((d) => {
+              const maxRev = Math.max(...dailySalesArr.map(x => x.revenue));
+              const dpct = maxRev > 0 ? (d.revenue / maxRev) * 100 : 0;
+              return (
+                <div key={d.date} className="daily-bar" title={`${d.date}: ${fmt(d.revenue)} (${d.orders} pedidos)`}>
+                  <div className="daily-bar__fill" style={{ height: `${Math.max(dpct, 5)}%` }} />
+                  <span className="daily-bar__label">{d.date.slice(5)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    ),
+    ranking: (
+      <div className="overview-section">
+        <h3>Ranking de Produtos</h3>
+        {loadingData ? (
+          <div className="shopee-spinner-sm" />
+        ) : productSalesArr.length === 0 ? (
+          <p className="text-muted">Nenhum produto vendido no período.</p>
+        ) : (
+          <table className="shopee-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Produto</th>
+                <th>Qtd</th>
+                <th>Receita</th>
+                <th>Custo</th>
+                <th>Imposto</th>
+                <th>Comissão</th>
+                <th>Lucro</th>
+                <th>Margem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productSalesArr.slice(0, 20).map((p, i) => {
+                const pTax = p.revenue * tax;
+                const pComm = p.revenue * 0.20;
+                const pProfit = p.revenue - p.cost - pTax - pComm;
+                const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
+                return (
+                  <tr key={p.itemId}>
+                    <td>{i + 1}</td>
+                    <td className="product-name">{p.name}</td>
+                    <td>{p.qty}</td>
+                    <td>{fmt(p.revenue)}</td>
+                    <td>
+                      {fmt(p.cost)}
+                      {!p.hasCost && <span className="badge badge--gray cost-badge">estimado</span>}
+                    </td>
+                    <td className="text-danger">{fmt(pTax)}</td>
+                    <td className="text-danger">{fmt(pComm)}</td>
+                    <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
+                    <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    ),
+    detailed: (
+      <div className="overview-section">
+        <h3>Vendas Detalhadas</h3>
+        {loadingData ? (
+          <div className="shopee-spinner-sm" />
+        ) : saleLines.length === 0 ? (
+          <p className="text-muted">Nenhuma venda no período selecionado.</p>
+        ) : (
+          <>
+            <table className="shopee-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Pedido</th>
+                  <th>Produto</th>
+                  <th>Qtd</th>
+                  <th>Preço Unit.</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {saleLines.slice(0, 50).map((s, i) => (
+                  <tr key={`${s.orderSn}-${i}`}>
+                    <td>{new Date(s.date * 1000).toLocaleDateString("pt-BR")}</td>
+                    <td className="order-sn">{s.orderSn}</td>
+                    <td className="product-name">{s.name}</td>
+                    <td>{s.qty}</td>
+                    <td>{fmt(s.unitPrice)}</td>
+                    <td>{fmt(s.subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {saleLines.length > 50 && (
+              <p className="text-muted" style={{ marginTop: 8 }}>
+                Mostrando as 50 vendas mais recentes de {saleLines.length} no período.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    ),
+  };
+
   return (
     <div className="shopee-container">
       <div className="shopee-header">
@@ -472,190 +726,22 @@ export default function ShopeePage() {
             </div>
           ) : (
             <>
-              {/* Vendas por produto (pizza) */}
-              {productSalesArr.length > 0 && (
-                <div className="overview-section">
-                  <h3>Vendas por Produto</h3>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="revenue"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={110}
-                        label={(entry: any) => `${totalRevenue > 0 ? ((entry.revenue / totalRevenue) * 100).toFixed(0) : 0}%`}
-                      >
-                        {pieData.map((_, i) => (
-                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip content={renderPieTooltip} />
-                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "0.78rem" }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+              {overviewOrder.length !== DEFAULT_OVERVIEW_ORDER.length ||
+                !DEFAULT_OVERVIEW_ORDER.every((k, i) => overviewOrder[i] === k) ? (
+                <button className="btn-reset-layout" onClick={() => setOverviewOrder(DEFAULT_OVERVIEW_ORDER)}>
+                  Restaurar ordem padrão
+                </button>
+              ) : null}
 
-              {/* Cards de resumo */}
-              <div className="overview-cards">
-                <div className="ov-card ov-card--revenue">
-                  <span className="ov-card__label">Faturamento</span>
-                  <span className="ov-card__value">{fmt(totalRevenue)}</span>
-                  <span className="ov-card__sub">{orders.length} pedidos</span>
-                </div>
-                <div className="ov-card ov-card--ticket">
-                  <span className="ov-card__label">Ticket Médio</span>
-                  <span className="ov-card__value">{fmt(avgTicket)}</span>
-                </div>
-                <div className="ov-card ov-card--shipping">
-                  <span className="ov-card__label">Frete Total</span>
-                  <span className="ov-card__value">{fmt(totalShipping)}</span>
-                  <span className="ov-card__sub">{pct(totalShipping).toFixed(1)}% da receita</span>
-                </div>
-                <div className="ov-card ov-card--tax">
-                  <span className="ov-card__label">Impostos ({taxRate}%)</span>
-                  <span className="ov-card__value">{fmt(totalTax)}</span>
-                  <span className="ov-card__sub">{pct(totalTax).toFixed(1)}% da receita</span>
-                </div>
-                <div className="ov-card ov-card--commission">
-                  <span className="ov-card__label">Comissão Shopee</span>
-                  <span className="ov-card__value">{fmt(shopeeCommission)}</span>
-                  <span className="ov-card__sub">~20% do faturamento</span>
-                </div>
-                <div className="ov-card ov-card--cost">
-                  <span className="ov-card__label">Custo dos Produtos</span>
-                  <span className="ov-card__value">{fmt(totalCost)}</span>
-                  <span className="ov-card__sub">{pct(totalCost).toFixed(1)}% da receita · {productsWithCostCount}/{productSalesArr.length} produtos com custo cadastrado</span>
-                </div>
-                <div className={`ov-card ${netProfit >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
-                  <span className="ov-card__label">Lucro Líquido</span>
-                  <span className="ov-card__value">{fmt(netProfit)}</span>
-                  <span className="ov-card__sub">Margem: {margin.toFixed(1)}%</span>
-                </div>
-              </div>
-
-              {costCoveragePct < 100 && productSalesArr.length > 0 && (
-                <div className="cost-warning">
-                  <strong>{(100 - costCoveragePct).toFixed(0)}% dos produtos vendidos</strong> nesse período ainda não têm custo cadastrado — o lucro acima usa uma estimativa de 40% pra eles. Cadastre o custo na aba "Produtos" pra ver o número real.
-                </div>
-              )}
-
-              {/* Vendas por dia */}
-              <div className="overview-section">
-                <h3>Vendas por Dia</h3>
-                {loadingData ? (
-                  <div className="shopee-spinner-sm" />
-                ) : dailySalesArr.length === 0 ? (
-                  <p className="text-muted">Nenhuma venda no período selecionado.</p>
-                ) : (
-                  <div className="daily-chart">
-                    {dailySalesArr.map((d) => {
-                      const maxRev = Math.max(...dailySalesArr.map(x => x.revenue));
-                      const pct = maxRev > 0 ? (d.revenue / maxRev) * 100 : 0;
-                      return (
-                        <div key={d.date} className="daily-bar" title={`${d.date}: ${fmt(d.revenue)} (${d.orders} pedidos)`}>
-                          <div className="daily-bar__fill" style={{ height: `${Math.max(pct, 5)}%` }} />
-                          <span className="daily-bar__label">{d.date.slice(5)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Top produtos */}
-              <div className="overview-section">
-                <h3>Ranking de Produtos</h3>
-                {loadingData ? (
-                  <div className="shopee-spinner-sm" />
-                ) : productSalesArr.length === 0 ? (
-                  <p className="text-muted">Nenhum produto vendido no período.</p>
-                ) : (
-                  <table className="shopee-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Produto</th>
-                        <th>Qtd</th>
-                        <th>Receita</th>
-                        <th>Custo</th>
-                        <th>Imposto</th>
-                        <th>Comissão</th>
-                        <th>Lucro</th>
-                        <th>Margem</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productSalesArr.slice(0, 20).map((p, i) => {
-                        const pTax = p.revenue * tax;
-                        const pComm = p.revenue * 0.20;
-                        const pProfit = p.revenue - p.cost - pTax - pComm;
-                        const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
-                        return (
-                          <tr key={p.itemId}>
-                            <td>{i + 1}</td>
-                            <td className="product-name">{p.name}</td>
-                            <td>{p.qty}</td>
-                            <td>{fmt(p.revenue)}</td>
-                            <td>
-                              {fmt(p.cost)}
-                              {!p.hasCost && <span className="badge badge--gray cost-badge">estimado</span>}
-                            </td>
-                            <td className="text-danger">{fmt(pTax)}</td>
-                            <td className="text-danger">{fmt(pComm)}</td>
-                            <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
-                            <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* Vendas detalhadas (uma linha por item vendido) */}
-              <div className="overview-section">
-                <h3>Vendas Detalhadas</h3>
-                {loadingData ? (
-                  <div className="shopee-spinner-sm" />
-                ) : saleLines.length === 0 ? (
-                  <p className="text-muted">Nenhuma venda no período selecionado.</p>
-                ) : (
-                  <>
-                    <table className="shopee-table">
-                      <thead>
-                        <tr>
-                          <th>Data</th>
-                          <th>Pedido</th>
-                          <th>Produto</th>
-                          <th>Qtd</th>
-                          <th>Preço Unit.</th>
-                          <th>Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {saleLines.slice(0, 50).map((s, i) => (
-                          <tr key={`${s.orderSn}-${i}`}>
-                            <td>{new Date(s.date * 1000).toLocaleDateString("pt-BR")}</td>
-                            <td className="order-sn">{s.orderSn}</td>
-                            <td className="product-name">{s.name}</td>
-                            <td>{s.qty}</td>
-                            <td>{fmt(s.unitPrice)}</td>
-                            <td>{fmt(s.subtotal)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {saleLines.length > 50 && (
-                      <p className="text-muted" style={{ marginTop: 8 }}>
-                        Mostrando as 50 vendas mais recentes de {saleLines.length} no período.
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+              {overviewOrder.map((key) => {
+                const content = overviewSections[key];
+                if (!content) return null;
+                return (
+                  <DraggableBox key={key} id={key}>
+                    {content}
+                  </DraggableBox>
+                );
+              })}
             </>
           )}
         </div>
