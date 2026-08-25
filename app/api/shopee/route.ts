@@ -322,6 +322,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ products: [], total: 0, hasMore: false });
   }
 
+  // Buscar variações (modelos) de um produto
+  if (action === "models") {
+    let config = getConfig();
+    if (!config.connected) {
+      return NextResponse.json({ error: "Shopee não conectada" }, { status: 400 });
+    }
+    config = await ensureValidToken(config);
+
+    const itemId = searchParams.get("item_id");
+    if (!itemId) {
+      return NextResponse.json({ error: "item_id obrigatório" }, { status: 400 });
+    }
+
+    const data = await shopeeRequest(config, "/api/v2/product/get_model_list", { item_id: itemId });
+
+    return NextResponse.json({
+      models: data.response?.model || [],
+    });
+  }
+
   // Buscar pedidos
   if (action === "orders") {
     let config = getConfig();

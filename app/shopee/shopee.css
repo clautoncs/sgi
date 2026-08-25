@@ -127,6 +127,42 @@
   font-size: 0.85rem;
 }
 
+.shopee-status-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.shopee-status-filter__label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.status-filter-btn {
+  padding: 5px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.status-filter-btn:hover {
+  border-color: #ee4d2d;
+  color: #ee4d2d;
+}
+
+.status-filter-btn--active {
+  background: #ee4d2d;
+  color: #fff;
+  border-color: #ee4d2d;
+}
+
 .btn-refresh {
   display: inline-flex;
   align-items: center;
@@ -424,6 +460,42 @@
   font-size: 0.65rem;
   padding: 1px 6px;
   vertical-align: middle;
+}
+
+/* Expandir variações (aba Produtos) */
+.expand-toggle {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.expand-toggle:hover {
+  border-color: #ee4d2d;
+  color: #ee4d2d;
+  background: #fef2f2;
+}
+
+.variation-cell {
+  background: #fafafa;
+  padding: 12px 12px 12px 40px !important;
+}
+
+.variation-table {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.variation-table th,
+.variation-table td {
+  font-size: 0.82rem;
 }
 
 /* Input de custo (aba Produtos) */

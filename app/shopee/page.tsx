@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import type { ReactNode } from "react";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import "./shopee.css";
@@ -20,6 +20,14 @@ interface Product {
   stock_info_v2: any;
   image: any;
   category_id: number;
+  has_model?: boolean;
+}
+
+interface ProductModel {
+  model_id: number;
+  model_name: string;
+  price_info: any[];
+  stock_info_v2: any;
 }
 
 interface Order {
@@ -48,6 +56,7 @@ const DEFAULT_OVERVIEW_SPANS: Record<string, number> = {
   detailed: 4,
 };
 const OVERVIEW_SPANS_STORAGE_KEY = "shopee-overview-spans";
+const CANCELLED_STATUSES = ["CANCELLED", "IN_CANCEL"];
 
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
@@ -61,6 +70,9 @@ export default function ShopeePage() {
   const [prevOrders, setPrevOrders] = useState<Order[]>([]);
   const [escrowList, setEscrowList] = useState<any[]>([]);
   const [costs, setCosts] = useState<Record<string, number>>({});
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  const [productModels, setProductModels] = useState<Record<string, ProductModel[]>>({});
+  const [loadingModels, setLoadingModels] = useState<Set<string>>(new Set());
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [savingCostId, setSavingCostId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -69,6 +81,7 @@ export default function ShopeePage() {
   const [overviewSpans, setOverviewSpans] = useState<Record<string, number>>(DEFAULT_OVERVIEW_SPANS);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<"paid" | "all" | "cancelled" | "unpaid">("paid");
 
   // Config form
   const [partnerId, setPartnerId] = useState("");
@@ -158,6 +171,27 @@ export default function ShopeePage() {
   }, []);
 
   useEffect(() => { if (status?.connected) fetchCosts(); }, [status?.connected, fetchCosts]);
+
+  const handleToggleExpand = async (itemId: number) => {
+    const key = String(itemId);
+    setExpandedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    if (!productModels[key]) {
+      setLoadingModels((prev) => new Set(prev).add(key));
+      try {
+        const res = await fetch(`/api/shopee?action=models&item_id=${itemId}`);
+        const data = await res.json();
+        setProductModels((prev) => ({ ...prev, [key]: data.models || [] }));
+      } catch { /* ignore */ }
+      finally {
+        setLoadingModels((prev) => { const next = new Set(prev); next.delete(key); return next; });
+      }
+    }
+  };
 
   const handleSaveCost = async (itemId: string, value: string) => {
     const cost = Number(value.replace(",", "."));
@@ -262,14 +296,14 @@ export default function ShopeePage() {
     if (!status?.connected) return;
     if (activeTab === "orders") fetchOrders();
     if (activeTab === "products") fetchProducts();
-    if (activeTab === "overview") fetchOrders();
+    if (activeTab === "overview") { fetchOrders(); fetchProducts(); }
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
   const handleRefresh = () => {
     if (activeTab === "orders") fetchOrders();
     if (activeTab === "products") fetchProducts();
-    if (activeTab === "overview") fetchOrders();
+    if (activeTab === "overview") { fetchOrders(); fetchProducts(); }
     if (activeTab === "dashboard") fetchDashboardData();
   };
 
@@ -318,22 +352,45 @@ export default function ShopeePage() {
     await fetchStatus();
   };
 
+  // Filtro de status: por padrão só entram pedidos "efetivados" (pagos e não
+  // cancelados) em todos os cálculos e listagens da página.
+  const matchesOrderStatusFilter = (o: Order) => {
+    if (orderStatusFilter === "all") return true;
+    if (orderStatusFilter === "unpaid") return o.order_status === "UNPAID";
+    if (orderStatusFilter === "cancelled") return CANCELLED_STATUSES.includes(o.order_status);
+    return o.order_status !== "UNPAID" && !CANCELLED_STATUSES.includes(o.order_status);
+  };
+  const filteredOrders = orders.filter(matchesOrderStatusFilter);
+  const filteredPrevOrders = prevOrders.filter(matchesOrderStatusFilter);
+  const unpaidCount = orders.filter((o) => o.order_status === "UNPAID").length;
+  const cancelledCount = orders.filter((o) => CANCELLED_STATUSES.includes(o.order_status)).length;
+
   // Cálculos do overview
   const tax = Number(taxRate) / 100;
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-  const totalShipping = orders.reduce((sum, o) => sum + (o.actual_shipping_fee || o.estimated_shipping_fee || 0), 0);
+  const totalRevenue = filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const totalShipping = filteredOrders.reduce((sum, o) => sum + (o.actual_shipping_fee || o.estimated_shipping_fee || 0), 0);
   const totalTax = totalRevenue * tax;
   const shopeeCommission = totalRevenue * 0.20; // 20% padrão Shopee
-  const avgTicket = orders.length > 0 ? totalRevenue / orders.length : 0;
+  const avgTicket = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
 
   // Agrupar vendas por produto e cruzar com o custo cadastrado em /produtos.
   // Sem custo cadastrado, cai no fallback de 40% (mesma estimativa de antes).
+  const productHasModel: Record<string, boolean> = {};
+  products.forEach((p) => { productHasModel[String(p.item_id)] = !!p.has_model; });
+
   const productSales: Record<string, { itemId: string; name: string; qty: number; revenue: number }> = {};
-  orders.forEach((order) => {
+  filteredOrders.forEach((order) => {
     (order.item_list || []).forEach((item: any) => {
-      const key = String(item.item_id);
+      // Produtos com variação usam custo por variação (item+model); sem
+      // variação, a chave é só o item_id — mesmo esquema usado ao salvar
+      // o custo na aba Produtos.
+      const isVariation = productHasModel[String(item.item_id)] && item.model_id;
+      const key = isVariation ? `${item.item_id}:${item.model_id}` : String(item.item_id);
+      const name = isVariation && item.model_name
+        ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
+        : (item.item_name || `Produto #${item.item_id}`);
       if (!productSales[key]) {
-        productSales[key] = { itemId: key, name: item.item_name || `Produto #${item.item_id}`, qty: 0, revenue: 0 };
+        productSales[key] = { itemId: key, name, qty: 0, revenue: 0 };
       }
       productSales[key].qty += item.model_quantity_purchased || 1;
       productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * (item.model_quantity_purchased || 1);
@@ -374,7 +431,7 @@ export default function ShopeePage() {
   ];
 
   // Cada venda individual (uma linha por item vendido, não agrupado por produto)
-  const saleLines = orders
+  const saleLines = filteredOrders
     .flatMap((order) =>
       (order.item_list || []).map((item: any) => {
         const qty = item.model_quantity_purchased || 1;
@@ -393,7 +450,7 @@ export default function ShopeePage() {
 
   // Agrupar vendas por dia
   const dailySales: Record<string, { date: string; revenue: number; orders: number }> = {};
-  orders.forEach((order) => {
+  filteredOrders.forEach((order) => {
     const d = new Date((order.pay_time || order.create_time) * 1000);
     const key = d.toISOString().split("T")[0];
     if (!dailySales[key]) dailySales[key] = { date: key, revenue: 0, orders: 0 };
@@ -404,16 +461,16 @@ export default function ShopeePage() {
 
   // Pedidos por status
   const statusCounts: Record<string, number> = {};
-  orders.forEach((o) => {
+  filteredOrders.forEach((o) => {
     const s = o.order_status || "DESCONHECIDO";
     statusCounts[s] = (statusCounts[s] || 0) + 1;
   });
   const statusArr = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
 
   // Comparativo com período anterior (mesma duração, imediatamente antes)
-  const prevRevenue = prevOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const prevRevenue = filteredPrevOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
   const revenueGrowth = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : (totalRevenue > 0 ? 100 : 0);
-  const ordersGrowth = prevOrders.length > 0 ? ((orders.length - prevOrders.length) / prevOrders.length) * 100 : (orders.length > 0 ? 100 : 0);
+  const ordersGrowth = filteredPrevOrders.length > 0 ? ((filteredOrders.length - filteredPrevOrders.length) / filteredPrevOrders.length) * 100 : (filteredOrders.length > 0 ? 100 : 0);
 
   // Financeiro real (escrow) - nomes de campo variam conforme versão da API da Shopee, por isso os fallbacks
   const escrowNet = escrowList.reduce((sum, e) => sum + (e.escrow_amount ?? e.escrow_amount_after_adjustment ?? 0), 0);
@@ -422,7 +479,7 @@ export default function ShopeePage() {
 
   // Produtos ativos sem venda no período
   const soldProductIds = new Set<string>();
-  orders.forEach((o) => (o.item_list || []).forEach((it: any) => soldProductIds.add(String(it.item_id))));
+  filteredOrders.forEach((o) => (o.item_list || []).forEach((it: any) => soldProductIds.add(String(it.item_id))));
   const activeProducts = products.filter((p) => p.item_status === "NORMAL");
   const staleProducts = activeProducts.filter((p) => !soldProductIds.has(String(p.item_id)));
 
@@ -530,7 +587,7 @@ export default function ShopeePage() {
           <div className="ov-card ov-card--revenue">
             <span className="ov-card__label">Faturamento</span>
             <span className="ov-card__value">{fmt(totalRevenue)}</span>
-            <span className="ov-card__sub">{orders.length} pedidos</span>
+            <span className="ov-card__sub">{filteredOrders.length} pedidos</span>
           </div>
           <div className="ov-card ov-card--ticket">
             <span className="ov-card__label">Ticket Médio</span>
@@ -763,6 +820,24 @@ export default function ShopeePage() {
         </div>
       )}
 
+      {status?.connected && (activeTab === "overview" || activeTab === "dashboard" || activeTab === "orders") && (
+        <div className="shopee-status-filter">
+          <span className="shopee-status-filter__label">Pedidos:</span>
+          <button className={`status-filter-btn ${orderStatusFilter === "paid" ? "status-filter-btn--active" : ""}`} onClick={() => setOrderStatusFilter("paid")}>
+            Efetivados
+          </button>
+          <button className={`status-filter-btn ${orderStatusFilter === "all" ? "status-filter-btn--active" : ""}`} onClick={() => setOrderStatusFilter("all")}>
+            Todos ({orders.length})
+          </button>
+          <button className={`status-filter-btn ${orderStatusFilter === "unpaid" ? "status-filter-btn--active" : ""}`} onClick={() => setOrderStatusFilter("unpaid")}>
+            Não Pagos ({unpaidCount})
+          </button>
+          <button className={`status-filter-btn ${orderStatusFilter === "cancelled" ? "status-filter-btn--active" : ""}`} onClick={() => setOrderStatusFilter("cancelled")}>
+            Cancelados ({cancelledCount})
+          </button>
+        </div>
+      )}
+
       {/* OVERVIEW */}
       {activeTab === "overview" && (
         <div className="shopee-overview">
@@ -826,7 +901,7 @@ export default function ShopeePage() {
                 </div>
                 <div className="ov-card ov-card--ticket">
                   <span className="ov-card__label">Pedidos</span>
-                  <span className="ov-card__value">{orders.length}</span>
+                  <span className="ov-card__value">{filteredOrders.length}</span>
                   <span className={`growth-badge ${ordersGrowth >= 0 ? "growth-badge--up" : "growth-badge--down"}`}>
                     {ordersGrowth >= 0 ? "+" : ""}{ordersGrowth.toFixed(1)}% vs período anterior
                   </span>
@@ -855,11 +930,11 @@ export default function ShopeePage() {
                         <div className="status-row__bar">
                           <div
                             className="status-row__fill"
-                            style={{ width: `${orders.length > 0 ? (count / orders.length) * 100 : 0}%` }}
+                            style={{ width: `${filteredOrders.length > 0 ? (count / filteredOrders.length) * 100 : 0}%` }}
                           />
                         </div>
                         <span className="status-row__count">
-                          {count} ({orders.length > 0 ? ((count / orders.length) * 100).toFixed(0) : 0}%)
+                          {count} ({filteredOrders.length > 0 ? ((count / filteredOrders.length) * 100).toFixed(0) : 0}%)
                         </span>
                       </div>
                     ))}
@@ -920,6 +995,7 @@ export default function ShopeePage() {
             <table className="shopee-table">
               <thead>
                 <tr>
+                  <th></th>
                   <th>ID</th>
                   <th>Produto</th>
                   <th>Status</th>
@@ -932,42 +1008,125 @@ export default function ShopeePage() {
               <tbody>
                 {products.map((p) => {
                   const key = String(p.item_id);
+                  const hasModel = !!p.has_model;
                   const price = p.price_info?.[0]?.current_price || p.price_info?.[0]?.original_price || 0;
                   const draft = costDrafts[key] ?? (costs[key] !== undefined ? String(costs[key]) : "");
                   const costValue = costs[key];
                   const priceMargin = costValue !== undefined && price > 0 ? ((price - costValue) / price) * 100 : null;
+                  const isExpanded = expandedProducts.has(key);
+                  const models = productModels[key] || [];
                   return (
-                    <tr key={p.item_id}>
-                      <td>{p.item_id}</td>
-                      <td className="product-name">{p.item_name}</td>
-                      <td>
-                        <span className={`badge ${p.item_status === "NORMAL" ? "badge--green" : "badge--gray"}`}>
-                          {p.item_status}
-                        </span>
-                      </td>
-                      <td>{price ? fmt(price) : "—"}</td>
-                      <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
-                      <td>
-                        <input
-                          type="number"
-                          className="cost-input"
-                          min="0"
-                          step="0.01"
-                          placeholder="0,00"
-                          value={draft}
-                          onChange={(e) => setCostDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
-                          onBlur={(e) => { if (e.target.value !== "") handleSaveCost(key, e.target.value); }}
-                        />
-                        {savingCostId === key && <span className="cost-input__saving">salvando...</span>}
-                      </td>
-                      <td className={priceMargin === null ? "text-muted" : priceMargin >= 0 ? "text-success" : "text-danger"}>
-                        {priceMargin === null ? "—" : `${priceMargin.toFixed(1)}%`}
-                      </td>
-                    </tr>
+                    <Fragment key={p.item_id}>
+                      <tr>
+                        <td>
+                          {hasModel && (
+                            <button
+                              type="button"
+                              className="expand-toggle"
+                              onClick={() => handleToggleExpand(p.item_id)}
+                              title={isExpanded ? "Ocultar variações" : "Ver variações"}
+                            >
+                              {isExpanded ? "−" : "+"}
+                            </button>
+                          )}
+                        </td>
+                        <td>{p.item_id}</td>
+                        <td className="product-name">{p.item_name}</td>
+                        <td>
+                          <span className={`badge ${p.item_status === "NORMAL" ? "badge--green" : "badge--gray"}`}>
+                            {p.item_status}
+                          </span>
+                        </td>
+                        {hasModel ? (
+                          <>
+                            <td className="text-muted">Várias variações</td>
+                            <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
+                            <td className="text-muted">Ver variações</td>
+                            <td className="text-muted">—</td>
+                          </>
+                        ) : (
+                          <>
+                            <td>{price ? fmt(price) : "—"}</td>
+                            <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
+                            <td>
+                              <input
+                                type="number"
+                                className="cost-input"
+                                min="0"
+                                step="0.01"
+                                placeholder="0,00"
+                                value={draft}
+                                onChange={(e) => setCostDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                                onBlur={(e) => { if (e.target.value !== "") handleSaveCost(key, e.target.value); }}
+                              />
+                              {savingCostId === key && <span className="cost-input__saving">salvando...</span>}
+                            </td>
+                            <td className={priceMargin === null ? "text-muted" : priceMargin >= 0 ? "text-success" : "text-danger"}>
+                              {priceMargin === null ? "—" : `${priceMargin.toFixed(1)}%`}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                      {hasModel && isExpanded && (
+                        <tr key={`${p.item_id}-models`}>
+                          <td colSpan={8} className="variation-cell">
+                            {loadingModels.has(key) ? (
+                              <div className="shopee-spinner-sm" />
+                            ) : models.length === 0 ? (
+                              <p className="text-muted">Nenhuma variação encontrada.</p>
+                            ) : (
+                              <table className="shopee-table variation-table">
+                                <thead>
+                                  <tr>
+                                    <th>Variação</th>
+                                    <th>Preço</th>
+                                    <th>Estoque</th>
+                                    <th>Custo</th>
+                                    <th>Margem</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {models.map((m) => {
+                                    const mKey = `${p.item_id}:${m.model_id}`;
+                                    const mPrice = m.price_info?.[0]?.current_price || m.price_info?.[0]?.original_price || 0;
+                                    const mDraft = costDrafts[mKey] ?? (costs[mKey] !== undefined ? String(costs[mKey]) : "");
+                                    const mCostValue = costs[mKey];
+                                    const mMargin = mCostValue !== undefined && mPrice > 0 ? ((mPrice - mCostValue) / mPrice) * 100 : null;
+                                    return (
+                                      <tr key={m.model_id}>
+                                        <td className="product-name">{m.model_name}</td>
+                                        <td>{mPrice ? fmt(mPrice) : "—"}</td>
+                                        <td>{m.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
+                                        <td>
+                                          <input
+                                            type="number"
+                                            className="cost-input"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="0,00"
+                                            value={mDraft}
+                                            onChange={(e) => setCostDrafts((prev) => ({ ...prev, [mKey]: e.target.value }))}
+                                            onBlur={(e) => { if (e.target.value !== "") handleSaveCost(mKey, e.target.value); }}
+                                          />
+                                          {savingCostId === mKey && <span className="cost-input__saving">salvando...</span>}
+                                        </td>
+                                        <td className={mMargin === null ? "text-muted" : mMargin >= 0 ? "text-success" : "text-danger"}>
+                                          {mMargin === null ? "—" : `${mMargin.toFixed(1)}%`}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
                 {products.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-muted">Nenhum produto encontrado</td></tr>
+                  <tr><td colSpan={8} className="text-center text-muted">Nenhum produto encontrado</td></tr>
                 )}
               </tbody>
             </table>
@@ -998,7 +1157,7 @@ export default function ShopeePage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
+                {filteredOrders.map((o) => (
                   <tr key={o.order_sn}>
                     <td className="order-sn">{o.order_sn}</td>
                     <td>{new Date((o.pay_time || o.create_time) * 1000).toLocaleDateString("pt-BR")}</td>
@@ -1013,7 +1172,7 @@ export default function ShopeePage() {
                     </td>
                   </tr>
                 ))}
-                {orders.length === 0 && (
+                {filteredOrders.length === 0 && (
                   <tr><td colSpan={7} className="text-center text-muted">Nenhum pedido no período</td></tr>
                 )}
               </tbody>
