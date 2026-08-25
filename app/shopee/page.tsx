@@ -946,6 +946,11 @@ export default function ShopeePage() {
               <h2>Conecte sua loja Shopee</h2>
               <p>Configure as credenciais na aba "Configuração" e conecte sua loja para visualizar os dados.</p>
             </div>
+          ) : loadingData ? (
+            <div className="content-loading-block">
+              <div className="content-loading-block__spinner" />
+              <p>Carregando dados do período... {loadingProgress}%</p>
+            </div>
           ) : (
             <>
               {(overviewOrder.length !== DEFAULT_OVERVIEW_ORDER.length ||
@@ -983,7 +988,10 @@ export default function ShopeePage() {
               <p>Conecte sua loja para ver o dashboard.</p>
             </div>
           ) : loadingDashboard ? (
-            <div className="shopee-spinner" />
+            <div className="content-loading-block">
+              <div className="content-loading-block__spinner" />
+              <p>Carregando dados do período... {loadingProgress}%</p>
+            </div>
           ) : (
             <>
               <div className="overview-cards">
@@ -1262,7 +1270,10 @@ export default function ShopeePage() {
               <p>Conecte sua loja para ver os pedidos.</p>
             </div>
           ) : loadingData ? (
-            <div className="shopee-spinner" />
+            <div className="content-loading-block">
+              <div className="content-loading-block__spinner" />
+              <p>Carregando dados do período... {loadingProgress}%</p>
+            </div>
           ) : (
             <table className="shopee-table">
               <thead>
