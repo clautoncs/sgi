@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import "./shopee.css";
 
 interface ShopeeStatus {
@@ -279,6 +280,42 @@ export default function ShopeePage() {
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   const pct = (v: number) => (totalRevenue > 0 ? (v / totalRevenue) * 100 : 0);
 
+  // Gráfico de pizza por produto (top 7 + "Outros" agrupando o resto, senão vira ilegível com centenas de fatias)
+  const PIE_COLORS = ["#ee4d2d", "#3b82f6", "#f59e0b", "#8b5cf6", "#22c55e", "#14b8a6", "#ec4899", "#64748b"];
+  const PIE_TOP_N = 7;
+  const pieTop = productSalesArr.slice(0, PIE_TOP_N);
+  const pieRest = productSalesArr.slice(PIE_TOP_N);
+  const pieData = [
+    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, hasCost: p.hasCost })),
+    ...(pieRest.length > 0
+      ? [{
+          name: `Outros (${pieRest.length} produtos)`,
+          revenue: pieRest.reduce((s, p) => s + p.revenue, 0),
+          qty: pieRest.reduce((s, p) => s + p.qty, 0),
+          cost: pieRest.reduce((s, p) => s + p.cost, 0),
+          hasCost: false,
+        }]
+      : []),
+  ];
+
+  // Cada venda individual (uma linha por item vendido, não agrupado por produto)
+  const saleLines = orders
+    .flatMap((order) =>
+      (order.item_list || []).map((item: any) => {
+        const qty = item.model_quantity_purchased || 1;
+        const unitPrice = item.model_discounted_price || item.model_original_price || 0;
+        return {
+          orderSn: order.order_sn,
+          date: order.pay_time || order.create_time,
+          name: item.item_name || `Produto #${item.item_id}`,
+          qty,
+          unitPrice,
+          subtotal: unitPrice * qty,
+        };
+      })
+    )
+    .sort((a, b) => b.date - a.date);
+
   // Agrupar vendas por dia
   const dailySales: Record<string, { date: string; revenue: number; orders: number }> = {};
   orders.forEach((order) => {
@@ -316,6 +353,25 @@ export default function ShopeePage() {
 
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  const renderPieTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    const pctOfTotal = totalRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
+    const dTax = d.revenue * tax;
+    const dComm = d.revenue * 0.20;
+    const dProfit = d.revenue - d.cost - dTax - dComm;
+    const dMargin = d.revenue > 0 ? (dProfit / d.revenue) * 100 : 0;
+    return (
+      <div className="pie-tooltip">
+        <strong>{d.name}</strong>
+        <span>{fmt(d.revenue)} · {pctOfTotal.toFixed(1)}% da receita</span>
+        <span>{d.qty} unidade{d.qty === 1 ? "" : "s"} vendida{d.qty === 1 ? "" : "s"}</span>
+        <span>Custo: {fmt(d.cost)}{!d.hasCost && " (estimado)"}</span>
+        <span className={dMargin >= 0 ? "text-success" : "text-danger"}>Margem: {dMargin.toFixed(1)}%</span>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -416,6 +472,32 @@ export default function ShopeePage() {
             </div>
           ) : (
             <>
+              {/* Vendas por produto (pizza) */}
+              {productSalesArr.length > 0 && (
+                <div className="overview-section">
+                  <h3>Vendas por Produto</h3>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="revenue"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={110}
+                        label={(entry: any) => `${totalRevenue > 0 ? ((entry.revenue / totalRevenue) * 100).toFixed(0) : 0}%`}
+                      >
+                        {pieData.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip content={renderPieTooltip} />
+                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "0.78rem" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
               {/* Cards de resumo */}
               <div className="overview-cards">
                 <div className="ov-card ov-card--revenue">
@@ -530,6 +612,48 @@ export default function ShopeePage() {
                       })}
                     </tbody>
                   </table>
+                )}
+              </div>
+
+              {/* Vendas detalhadas (uma linha por item vendido) */}
+              <div className="overview-section">
+                <h3>Vendas Detalhadas</h3>
+                {loadingData ? (
+                  <div className="shopee-spinner-sm" />
+                ) : saleLines.length === 0 ? (
+                  <p className="text-muted">Nenhuma venda no período selecionado.</p>
+                ) : (
+                  <>
+                    <table className="shopee-table">
+                      <thead>
+                        <tr>
+                          <th>Data</th>
+                          <th>Pedido</th>
+                          <th>Produto</th>
+                          <th>Qtd</th>
+                          <th>Preço Unit.</th>
+                          <th>Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {saleLines.slice(0, 50).map((s, i) => (
+                          <tr key={`${s.orderSn}-${i}`}>
+                            <td>{new Date(s.date * 1000).toLocaleDateString("pt-BR")}</td>
+                            <td className="order-sn">{s.orderSn}</td>
+                            <td className="product-name">{s.name}</td>
+                            <td>{s.qty}</td>
+                            <td>{fmt(s.unitPrice)}</td>
+                            <td>{fmt(s.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {saleLines.length > 50 && (
+                      <p className="text-muted" style={{ marginTop: 8 }}>
+                        Mostrando as 50 vendas mais recentes de {saleLines.length} no período.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </>
