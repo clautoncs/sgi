@@ -864,6 +864,12 @@ export default function ShopeePage() {
           <button className={`period-btn ${period === "week" ? "period-btn--active" : ""}`} onClick={() => setPeriod("week")}>Semana</button>
           <button className={`period-btn ${period === "month" ? "period-btn--active" : ""}`} onClick={() => setPeriod("month")}>Mês</button>
           <button className={`period-btn ${period === "custom" ? "period-btn--active" : ""}`} onClick={() => setPeriod("custom")}>Período</button>
+          {isRefreshing && (
+            <span className="period-loading-badge">
+              <span className="period-loading-badge__spinner" />
+              Carregando dados do período...
+            </span>
+          )}
           {period === "custom" && (
             <div className="period-custom">
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
@@ -1070,6 +1076,9 @@ export default function ShopeePage() {
                   <th>Preço</th>
                   <th>Estoque</th>
                   <th>Custo</th>
+                  <th>Imposto</th>
+                  <th>Comissão</th>
+                  <th>Lucro</th>
                   <th>Margem</th>
                 </tr>
               </thead>
@@ -1080,7 +1089,10 @@ export default function ShopeePage() {
                   const price = p.price_info?.[0]?.current_price || p.price_info?.[0]?.original_price || 0;
                   const draft = costDrafts[key] ?? (costs[key] !== undefined ? String(costs[key]) : "");
                   const costValue = costs[key];
-                  const priceMargin = costValue !== undefined && price > 0 ? ((price - costValue) / price) * 100 : null;
+                  const priceTax = price * tax;
+                  const priceComm = price * 0.20;
+                  const priceProfit = costValue !== undefined ? price - costValue - priceTax - priceComm : null;
+                  const priceMargin = priceProfit !== null && price > 0 ? (priceProfit / price) * 100 : null;
                   const isExpanded = expandedProducts.has(key);
                   const models = productModels[key] || [];
                   return (
@@ -1111,6 +1123,9 @@ export default function ShopeePage() {
                             <td>{p.stock_info_v2?.summary_info?.total_available_stock ?? "—"}</td>
                             <td className="text-muted">Ver variações</td>
                             <td className="text-muted">—</td>
+                            <td className="text-muted">—</td>
+                            <td className="text-muted">—</td>
+                            <td className="text-muted">—</td>
                           </>
                         ) : (
                           <>
@@ -1129,6 +1144,11 @@ export default function ShopeePage() {
                               />
                               {savingCostId === key && <span className="cost-input__saving">salvando...</span>}
                             </td>
+                            <td className="text-danger">{price ? fmt(priceTax) : "—"}</td>
+                            <td className="text-danger">{price ? fmt(priceComm) : "—"}</td>
+                            <td className={priceProfit === null ? "text-muted" : priceProfit >= 0 ? "text-success" : "text-danger"}>
+                              {priceProfit === null ? "—" : fmt(priceProfit)}
+                            </td>
                             <td className={priceMargin === null ? "text-muted" : priceMargin >= 0 ? "text-success" : "text-danger"}>
                               {priceMargin === null ? "—" : `${priceMargin.toFixed(1)}%`}
                             </td>
@@ -1137,7 +1157,7 @@ export default function ShopeePage() {
                       </tr>
                       {hasModel && isExpanded && (
                         <tr key={`${p.item_id}-models`}>
-                          <td colSpan={8} className="variation-cell">
+                          <td colSpan={11} className="variation-cell">
                             {loadingModels.has(key) ? (
                               <div className="shopee-spinner-sm" />
                             ) : models.length === 0 ? (
@@ -1150,6 +1170,9 @@ export default function ShopeePage() {
                                     <th>Preço</th>
                                     <th>Estoque</th>
                                     <th>Custo</th>
+                                    <th>Imposto</th>
+                                    <th>Comissão</th>
+                                    <th>Lucro</th>
                                     <th>Margem</th>
                                   </tr>
                                 </thead>
@@ -1159,7 +1182,10 @@ export default function ShopeePage() {
                                     const mPrice = m.price_info?.[0]?.current_price || m.price_info?.[0]?.original_price || 0;
                                     const mDraft = costDrafts[mKey] ?? (costs[mKey] !== undefined ? String(costs[mKey]) : "");
                                     const mCostValue = costs[mKey];
-                                    const mMargin = mCostValue !== undefined && mPrice > 0 ? ((mPrice - mCostValue) / mPrice) * 100 : null;
+                                    const mTax = mPrice * tax;
+                                    const mComm = mPrice * 0.20;
+                                    const mProfit = mCostValue !== undefined ? mPrice - mCostValue - mTax - mComm : null;
+                                    const mMargin = mProfit !== null && mPrice > 0 ? (mProfit / mPrice) * 100 : null;
                                     return (
                                       <tr key={m.model_id}>
                                         <td className="product-name">{m.model_name}</td>
@@ -1178,6 +1204,11 @@ export default function ShopeePage() {
                                           />
                                           {savingCostId === mKey && <span className="cost-input__saving">salvando...</span>}
                                         </td>
+                                        <td className="text-danger">{mPrice ? fmt(mTax) : "—"}</td>
+                                        <td className="text-danger">{mPrice ? fmt(mComm) : "—"}</td>
+                                        <td className={mProfit === null ? "text-muted" : mProfit >= 0 ? "text-success" : "text-danger"}>
+                                          {mProfit === null ? "—" : fmt(mProfit)}
+                                        </td>
                                         <td className={mMargin === null ? "text-muted" : mMargin >= 0 ? "text-success" : "text-danger"}>
                                           {mMargin === null ? "—" : `${mMargin.toFixed(1)}%`}
                                         </td>
@@ -1194,7 +1225,7 @@ export default function ShopeePage() {
                   );
                 })}
                 {products.length === 0 && (
-                  <tr><td colSpan={8} className="text-center text-muted">Nenhum produto encontrado</td></tr>
+                  <tr><td colSpan={11} className="text-center text-muted">Nenhum produto encontrado</td></tr>
                 )}
               </tbody>
             </table>
