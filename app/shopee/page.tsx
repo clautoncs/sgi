@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, Fragment } from "react";
 import type { ReactNode } from "react";
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import "./shopee.css";
 
 interface ShopeeStatus {
@@ -570,13 +570,13 @@ export default function ShopeePage() {
               cy="50%"
               outerRadius={110}
               label={(entry: any) => `${totalRevenue > 0 ? ((entry.revenue / totalRevenue) * 100).toFixed(0) : 0}%`}
+              labelLine={false}
             >
               {pieData.map((_, i) => (
                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
               ))}
             </Pie>
             <RechartsTooltip content={renderPieTooltip} />
-            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: "0.78rem" }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
