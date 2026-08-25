@@ -44,6 +44,32 @@ interface Order {
 
 type PeriodFilter = "today" | "yesterday" | "week" | "month" | "custom";
 
+// O servidor roda em UTC, mas a loja opera no horário de Brasília
+// (UTC-3, sem horário de verão desde 2019) — todo cálculo de "dia"
+// (hoje/ontem/vendas por dia) precisa considerar esse fuso, senão
+// vendas feitas à noite caem no dia seguinte.
+const BR_TIMEZONE = "America/Sao_Paulo";
+const BR_OFFSET_SEC = 3 * 3600;
+
+function brDateKey(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BR_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")?.value;
+  const m = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return `${y}-${m}-${day}`;
+}
+
+// Meia-noite (00:00) de Brasília de uma data "YYYY-MM-DD", como epoch UTC real.
+function brMidnightFromDateStr(dateStr: string): number {
+  return Math.floor(new Date(dateStr).getTime() / 1000) + BR_OFFSET_SEC;
+}
+
 const DEFAULT_OVERVIEW_ORDER = ["pizza", "summary", "daily", "ranking", "detailed"];
 const OVERVIEW_ORDER_STORAGE_KEY = "shopee-overview-order";
 // Largura de cada caixa em colunas (grade de 4) — pizza e vendas por dia
@@ -210,9 +236,8 @@ export default function ShopeePage() {
 
   const getTimeRange = useCallback(() => {
     const now = Math.floor(Date.now() / 1000);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTs = Math.floor(today.getTime() / 1000);
+    // Início do dia de hoje na hora de Brasília (não na hora do servidor, que é UTC).
+    const todayTs = Math.floor((now - BR_OFFSET_SEC) / 86400) * 86400 + BR_OFFSET_SEC;
 
     switch (period) {
       case "today":
@@ -225,8 +250,9 @@ export default function ShopeePage() {
         return { from: todayTs - 30 * 86400, to: now };
       case "custom":
         return {
-          from: customFrom ? Math.floor(new Date(customFrom).getTime() / 1000) : todayTs - 30 * 86400,
-          to: customTo ? Math.floor(new Date(customTo).getTime() / 1000) : now,
+          // "até" é inclusivo: vai até o fim do dia escolhido (meia-noite seguinte), não só o início.
+          from: customFrom ? brMidnightFromDateStr(customFrom) : todayTs - 30 * 86400,
+          to: customTo ? brMidnightFromDateStr(customTo) + 86400 : now,
         };
       default:
         return { from: todayTs - 30 * 86400, to: now };
@@ -436,13 +462,31 @@ export default function ShopeePage() {
       (order.item_list || []).map((item: any) => {
         const qty = item.model_quantity_purchased || 1;
         const unitPrice = item.model_discounted_price || item.model_original_price || 0;
+        const subtotal = unitPrice * qty;
+        const isVariation = productHasModel[String(item.item_id)] && item.model_id;
+        const costKey = isVariation ? `${item.item_id}:${item.model_id}` : String(item.item_id);
+        const name = isVariation && item.model_name
+          ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
+          : (item.item_name || `Produto #${item.item_id}`);
+        const hasCost = Object.prototype.hasOwnProperty.call(costs, costKey);
+        const cost = hasCost ? costs[costKey] * qty : subtotal * 0.40;
+        const lineTax = subtotal * tax;
+        const lineComm = subtotal * 0.20;
+        const profit = subtotal - cost - lineTax - lineComm;
+        const margin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
         return {
           orderSn: order.order_sn,
           date: order.pay_time || order.create_time,
-          name: item.item_name || `Produto #${item.item_id}`,
+          name,
           qty,
           unitPrice,
-          subtotal: unitPrice * qty,
+          subtotal,
+          hasCost,
+          cost,
+          tax: lineTax,
+          commission: lineComm,
+          profit,
+          margin,
         };
       })
     )
@@ -451,8 +495,7 @@ export default function ShopeePage() {
   // Agrupar vendas por dia
   const dailySales: Record<string, { date: string; revenue: number; orders: number }> = {};
   filteredOrders.forEach((order) => {
-    const d = new Date((order.pay_time || order.create_time) * 1000);
-    const key = d.toISOString().split("T")[0];
+    const key = brDateKey(order.pay_time || order.create_time);
     if (!dailySales[key]) dailySales[key] = { date: key, revenue: 0, orders: 0 };
     dailySales[key].revenue += order.total_amount || 0;
     dailySales[key].orders += 1;
@@ -717,18 +760,31 @@ export default function ShopeePage() {
                   <th>Produto</th>
                   <th>Qtd</th>
                   <th>Preço Unit.</th>
-                  <th>Subtotal</th>
+                  <th>Receita</th>
+                  <th>Custo</th>
+                  <th>Imposto</th>
+                  <th>Comissão</th>
+                  <th>Lucro</th>
+                  <th>Margem</th>
                 </tr>
               </thead>
               <tbody>
                 {saleLines.slice(0, 50).map((s, i) => (
                   <tr key={`${s.orderSn}-${i}`}>
-                    <td>{new Date(s.date * 1000).toLocaleDateString("pt-BR")}</td>
+                    <td>{new Date(s.date * 1000).toLocaleDateString("pt-BR", { timeZone: BR_TIMEZONE })}</td>
                     <td className="order-sn">{s.orderSn}</td>
                     <td className="product-name">{s.name}</td>
                     <td>{s.qty}</td>
                     <td>{fmt(s.unitPrice)}</td>
                     <td>{fmt(s.subtotal)}</td>
+                    <td>
+                      {fmt(s.cost)}
+                      {!s.hasCost && <span className="badge badge--gray cost-badge">estimado</span>}
+                    </td>
+                    <td className="text-danger">{fmt(s.tax)}</td>
+                    <td className="text-danger">{fmt(s.commission)}</td>
+                    <td className={s.profit >= 0 ? "text-success" : "text-danger"}>{fmt(s.profit)}</td>
+                    <td className={s.margin >= 0 ? "text-success" : "text-danger"}>{s.margin.toFixed(1)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -1160,7 +1216,7 @@ export default function ShopeePage() {
                 {filteredOrders.map((o) => (
                   <tr key={o.order_sn}>
                     <td className="order-sn">{o.order_sn}</td>
-                    <td>{new Date((o.pay_time || o.create_time) * 1000).toLocaleDateString("pt-BR")}</td>
+                    <td>{new Date((o.pay_time || o.create_time) * 1000).toLocaleDateString("pt-BR", { timeZone: BR_TIMEZONE })}</td>
                     <td>{o.buyer_username || "—"}</td>
                     <td>{o.item_list?.length || 0}</td>
                     <td>{fmt(o.total_amount || 0)}</td>
