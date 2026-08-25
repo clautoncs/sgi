@@ -677,6 +677,75 @@
 .text-muted { color: #9ca3af; font-style: italic; }
 .text-center { text-align: center; }
 
+/* Calculadora de preço/margem */
+.shopee-calculator {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.calc-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.calc-toggle__btn {
+  padding: 8px 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calc-toggle__btn:hover {
+  border-color: #ee4d2d;
+}
+
+.calc-toggle__btn--active {
+  background: #ee4d2d;
+  color: #fff;
+  border-color: #ee4d2d;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.calc-checkbox {
+  display: flex;
+  align-items: flex-end;
+}
+
+.calc-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.calc-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.calc-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
 /* Config */
 .shopee-config {
   display: flex;

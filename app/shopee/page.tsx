@@ -87,7 +87,7 @@ const CANCELLED_STATUSES = ["CANCELLED", "IN_CANCEL"];
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "config">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "calculator" | "config">("overview");
   const [period, setPeriod] = useState<PeriodFilter>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -108,6 +108,17 @@ export default function ShopeePage() {
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<"paid" | "all" | "cancelled" | "unpaid">("paid");
+
+  // Calculadora de preço/margem
+  const [calcBusinessType, setCalcBusinessType] = useState<"cnpj" | "cpf">("cnpj");
+  const [calcProductCost, setCalcProductCost] = useState("");
+  const [calcAdditionalCosts, setCalcAdditionalCosts] = useState("");
+  const [calcShopeeAdvance, setCalcShopeeAdvance] = useState("");
+  const [calcSalesTax, setCalcSalesTax] = useState("");
+  const [calcProfitMargin, setCalcProfitMargin] = useState("");
+  const [calcManualSaleValue, setCalcManualSaleValue] = useState("");
+  const [calcFeaturedCampaigns, setCalcFeaturedCampaigns] = useState(false);
+  const [calcAdsPercent, setCalcAdsPercent] = useState("");
 
   // Config form
   const [partnerId, setPartnerId] = useState("");
@@ -559,6 +570,70 @@ export default function ShopeePage() {
   const fmt = (v: number) =>
     v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  // Calculadora de preço/margem — modo direto (calcula o preço de venda a
+  // partir da margem desejada) ou reverso (parte de um valor de venda manual
+  // e calcula a margem resultante). Taxas ficam todas editáveis pelo usuário
+  // porque a alíquota real varia por CNPJ/CPF e por conta — não tem como
+  // cravar um número oficial aqui.
+  const calc = (() => {
+    const custo = Number(calcProductCost.replace(",", ".")) || 0;
+    const custosAdicionais = Number(calcAdditionalCosts.replace(",", ".")) || 0;
+    const custoTotal = custo + custosAdicionais;
+    const shopeeAntecipa = (Number(calcShopeeAdvance.replace(",", ".")) || 0) / 100;
+    const imposto = (Number(calcSalesTax.replace(",", ".")) || 0) / 100;
+    const campanhas = calcFeaturedCampaigns ? 0.025 : 0;
+    const adsPct = (Number(calcAdsPercent.replace(",", ".")) || 0) / 100;
+    const margemDesejada = (Number(calcProfitMargin.replace(",", ".")) || 0) / 100;
+    const manual = calcManualSaleValue ? Number(calcManualSaleValue.replace(",", ".")) || 0 : 0;
+
+    const totalTaxasPct = shopeeAntecipa + imposto + campanhas;
+
+    if (custoTotal <= 0) {
+      return { valid: false as const, reason: "Informe o custo do produto." };
+    }
+
+    let precoVenda: number;
+    let modo: "direto" | "reverso";
+
+    if (manual > 0) {
+      precoVenda = manual;
+      modo = "reverso";
+    } else {
+      const denominador = 1 - totalTaxasPct - margemDesejada * (1 + adsPct);
+      if (denominador <= 0) {
+        return { valid: false as const, reason: "Essa combinação de taxas + margem não fecha (passa de 100% do preço). Reduza a margem ou as taxas." };
+      }
+      precoVenda = custoTotal / denominador;
+      modo = "direto";
+    }
+
+    const taxasValor = totalTaxasPct * precoVenda;
+    let lucroBruto: number;
+    if (modo === "reverso") {
+      const denomReverso = 1 + adsPct;
+      lucroBruto = (precoVenda * (1 - totalTaxasPct) - custoTotal) / denomReverso;
+    } else {
+      lucroBruto = margemDesejada * precoVenda;
+    }
+    const adsValor = adsPct * lucroBruto;
+    const lucroLiquido = lucroBruto - adsValor;
+    const margemBruta = precoVenda > 0 ? (lucroBruto / precoVenda) * 100 : 0;
+    const margemLiquida = precoVenda > 0 ? (lucroLiquido / precoVenda) * 100 : 0;
+
+    return {
+      valid: true as const,
+      modo,
+      custoTotal,
+      precoVenda,
+      taxasValor,
+      lucroBruto,
+      adsValor,
+      lucroLiquido,
+      margemBruta,
+      margemLiquida,
+    };
+  })();
+
   const renderPieTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
     const d = payload[0].payload;
@@ -868,6 +943,9 @@ export default function ShopeePage() {
         </button>
         <button className={`shopee-tab ${activeTab === "orders" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("orders")}>
           Pedidos
+        </button>
+        <button className={`shopee-tab ${activeTab === "calculator" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("calculator")}>
+          Calculadora
         </button>
         <button className={`shopee-tab ${activeTab === "config" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("config")}>
           Configuração
@@ -1309,6 +1387,99 @@ export default function ShopeePage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* CALCULADORA */}
+      {activeTab === "calculator" && (
+        <div className="shopee-calculator">
+          <div className="config-card">
+            <h3>Calculadora de Preço e Margem</h3>
+            <p className="text-muted">Calcule o preço de venda ideal a partir da margem desejada, ou informe um valor de venda manual pra ver a margem resultante. Taxas ficam todas editáveis — ajuste conforme seu enquadramento.</p>
+
+            <div className="calc-toggle">
+              <button
+                type="button"
+                className={`calc-toggle__btn ${calcBusinessType === "cnpj" ? "calc-toggle__btn--active" : ""}`}
+                onClick={() => setCalcBusinessType("cnpj")}
+              >
+                🏢 CNPJ
+              </button>
+              <button
+                type="button"
+                className={`calc-toggle__btn ${calcBusinessType === "cpf" ? "calc-toggle__btn--active" : ""}`}
+                onClick={() => setCalcBusinessType("cpf")}
+              >
+                👤 CPF
+              </button>
+            </div>
+
+            <div className="calc-grid">
+              <div className="form-group">
+                <label>Custo do Produto (R$)</label>
+                <input type="text" inputMode="decimal" placeholder="0,00" value={calcProductCost} onChange={(e) => setCalcProductCost(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Custos Adicionais (R$)</label>
+                <input type="text" inputMode="decimal" placeholder="0,00" value={calcAdditionalCosts} onChange={(e) => setCalcAdditionalCosts(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Shopee Antecipa (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcShopeeAdvance} onChange={(e) => setCalcShopeeAdvance(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Imposto sobre Venda (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcSalesTax} onChange={(e) => setCalcSalesTax(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Margem de Lucro desejada (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcProfitMargin} onChange={(e) => setCalcProfitMargin(e.target.value)} disabled={!!calcManualSaleValue} />
+              </div>
+              <div className="form-group">
+                <label>Valor de Venda (manual, opcional)</label>
+                <input type="text" inputMode="decimal" placeholder="R$ 0,00" value={calcManualSaleValue} onChange={(e) => setCalcManualSaleValue(e.target.value)} />
+              </div>
+              <div className="form-group calc-checkbox">
+                <label>
+                  <input type="checkbox" checked={calcFeaturedCampaigns} onChange={(e) => setCalcFeaturedCampaigns(e.target.checked)} />
+                  Campanhas de Destaque (+2,5%)
+                </label>
+              </div>
+              <div className="form-group">
+                <label>% investida do lucro em ads (ROAS ativo)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcAdsPercent} onChange={(e) => setCalcAdsPercent(e.target.value)} />
+              </div>
+            </div>
+
+            {!calc.valid ? (
+              <p className="cost-warning" style={{ marginTop: 20 }}>{calc.reason}</p>
+            ) : (
+              <div className="calc-results">
+                <div className="ov-card ov-card--revenue">
+                  <span className="ov-card__label">{calc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
+                  <span className="ov-card__value">{fmt(calc.precoVenda)}</span>
+                </div>
+                <div className="ov-card ov-card--tax">
+                  <span className="ov-card__label">Taxas (Shopee + Imposto + Campanhas)</span>
+                  <span className="ov-card__value">{fmt(calc.taxasValor)}</span>
+                </div>
+                <div className="ov-card ov-card--commission">
+                  <span className="ov-card__label">Investimento em Ads</span>
+                  <span className="ov-card__value">{fmt(calc.adsValor)}</span>
+                </div>
+                <div className="ov-card ov-card--profit">
+                  <span className="ov-card__label">Lucro Bruto</span>
+                  <span className="ov-card__value">{fmt(calc.lucroBruto)}</span>
+                  <span className="ov-card__sub">Margem bruta: {calc.margemBruta.toFixed(1)}%</span>
+                </div>
+                <div className={`ov-card ${calc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
+                  <span className="ov-card__label">Lucro Líquido (após ads)</span>
+                  <span className="ov-card__value">{fmt(calc.lucroLiquido)}</span>
+                  <span className="ov-card__sub">Margem líquida: {calc.margemLiquida.toFixed(1)}%</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
