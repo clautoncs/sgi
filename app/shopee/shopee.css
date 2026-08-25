@@ -146,6 +146,24 @@
   border-top-color: #ea580c;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.period-loading-badge__bar {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: #fed7aa;
+  overflow: hidden;
+}
+
+.period-loading-badge__bar-fill {
+  display: block;
+  height: 100%;
+  background: #ea580c;
+  border-radius: 3px;
+  transition: width 0.25s ease-out;
 }
 
 .shopee-status-filter {

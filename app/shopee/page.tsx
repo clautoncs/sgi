@@ -320,28 +320,46 @@ export default function ShopeePage() {
     } catch { /* ignore */ }
   }, [status, getTimeRange]);
 
+  // Conta quantas das buscas do lote atual (pedidos, produtos, financeiro...)
+  // já terminaram, pra mostrar uma porcentagem real de progresso em vez de
+  // só um "carregando" genérico.
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const trackProgress = useCallback((promises: Promise<any>[]) => {
+    const total = promises.length;
+    let done = 0;
+    setLoadingProgress(total > 0 ? 0 : 100);
+    return Promise.all(
+      promises.map((p) =>
+        p.finally(() => {
+          done += 1;
+          setLoadingProgress(Math.round((done / total) * 100));
+        })
+      )
+    );
+  }, []);
+
   const fetchDashboardData = useCallback(async () => {
     if (!status?.connected) return;
     setLoadingDashboard(true);
     try {
-      await Promise.all([fetchOrders(), fetchProducts(), fetchFinance(), fetchPreviousOrders()]);
+      await trackProgress([fetchOrders(), fetchProducts(), fetchFinance(), fetchPreviousOrders()]);
     } finally {
       setLoadingDashboard(false);
     }
-  }, [status, fetchOrders, fetchProducts, fetchFinance, fetchPreviousOrders]);
+  }, [status, fetchOrders, fetchProducts, fetchFinance, fetchPreviousOrders, trackProgress]);
 
   useEffect(() => {
     if (!status?.connected) return;
-    if (activeTab === "orders") fetchOrders();
-    if (activeTab === "products") fetchProducts();
-    if (activeTab === "overview") { fetchOrders(); fetchProducts(); }
+    if (activeTab === "orders") trackProgress([fetchOrders()]);
+    if (activeTab === "products") trackProgress([fetchProducts()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts()]);
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
   const handleRefresh = () => {
-    if (activeTab === "orders") fetchOrders();
-    if (activeTab === "products") fetchProducts();
-    if (activeTab === "overview") { fetchOrders(); fetchProducts(); }
+    if (activeTab === "orders") trackProgress([fetchOrders()]);
+    if (activeTab === "products") trackProgress([fetchProducts()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts()]);
     if (activeTab === "dashboard") fetchDashboardData();
   };
 
@@ -867,7 +885,10 @@ export default function ShopeePage() {
           {isRefreshing && (
             <span className="period-loading-badge">
               <span className="period-loading-badge__spinner" />
-              Carregando dados do período...
+              Carregando dados do período... {loadingProgress}%
+              <span className="period-loading-badge__bar">
+                <span className="period-loading-badge__bar-fill" style={{ width: `${loadingProgress}%` }} />
+              </span>
             </span>
           )}
           {period === "custom" && (
