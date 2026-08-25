@@ -806,9 +806,9 @@ export default function ShopeePage() {
                 <button className="btn btn--primary" onClick={handleSaveCredentials} disabled={saving}>
                   {saving ? "Salvando..." : "Salvar Credenciais"}
                 </button>
-                {status?.hasCredentials && !status?.connected && (
+                {status?.hasCredentials && (
                   <button className="btn btn--success" onClick={handleConnect}>
-                    Conectar Loja Shopee
+                    {status?.connected ? "Reconectar Loja Shopee" : "Conectar Loja Shopee"}
                   </button>
                 )}
               </div>
