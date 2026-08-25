@@ -34,16 +34,26 @@ interface Order {
   item_list: any[];
 }
 
-type PeriodFilter = "today" | "week" | "month" | "custom";
+type PeriodFilter = "today" | "yesterday" | "week" | "month" | "custom";
 
 const DEFAULT_OVERVIEW_ORDER = ["pizza", "summary", "daily", "ranking", "detailed"];
 const OVERVIEW_ORDER_STORAGE_KEY = "shopee-overview-order";
+// Largura de cada caixa em colunas (grade de 4) — pizza e vendas por dia
+// ficam lado a lado (2+2) por padrão, o resto ocupa a linha inteira.
+const DEFAULT_OVERVIEW_SPANS: Record<string, number> = {
+  pizza: 2,
+  summary: 4,
+  daily: 2,
+  ranking: 4,
+  detailed: 4,
+};
+const OVERVIEW_SPANS_STORAGE_KEY = "shopee-overview-spans";
 
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "config">("overview");
-  const [period, setPeriod] = useState<PeriodFilter>("month");
+  const [period, setPeriod] = useState<PeriodFilter>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,6 +66,7 @@ export default function ShopeePage() {
   const [loadingData, setLoadingData] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [overviewOrder, setOverviewOrder] = useState<string[]>(DEFAULT_OVERVIEW_ORDER);
+  const [overviewSpans, setOverviewSpans] = useState<Record<string, number>>(DEFAULT_OVERVIEW_SPANS);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
@@ -102,6 +113,26 @@ export default function ShopeePage() {
   useEffect(() => {
     try { localStorage.setItem(OVERVIEW_ORDER_STORAGE_KEY, JSON.stringify(overviewOrder)); } catch { /* ignore */ }
   }, [overviewOrder]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(OVERVIEW_SPANS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && Object.keys(DEFAULT_OVERVIEW_SPANS).every((k) => k in parsed)) {
+          setOverviewSpans(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem(OVERVIEW_SPANS_STORAGE_KEY, JSON.stringify(overviewSpans)); } catch { /* ignore */ }
+  }, [overviewSpans]);
+
+  const handleSetSpan = (key: string, span: number) => {
+    setOverviewSpans((prev) => ({ ...prev, [key]: span }));
+  };
 
   const handleBoxDrop = (targetKey: string) => {
     setDragOverKey(null);
@@ -152,6 +183,8 @@ export default function ShopeePage() {
     switch (period) {
       case "today":
         return { from: todayTs, to: now };
+      case "yesterday":
+        return { from: todayTs - 86400, to: todayTs };
       case "week":
         return { from: todayTs - 7 * 86400, to: now };
       case "month":
@@ -424,29 +457,47 @@ export default function ShopeePage() {
     );
   }
 
-  const DraggableBox = ({ id, children }: { id: string; children: ReactNode }) => (
-    <div
-      className={[
-        "draggable-box",
-        draggedKey === id ? "draggable-box--dragging" : "",
-        dragOverKey === id && draggedKey !== id ? "draggable-box--over" : "",
-      ].filter(Boolean).join(" ")}
-      draggable
-      onDragStart={() => setDraggedKey(id)}
-      onDragEnd={() => { setDraggedKey(null); setDragOverKey(null); }}
-      onDragOver={(e) => { e.preventDefault(); if (dragOverKey !== id) setDragOverKey(id); }}
-      onDrop={(e) => { e.preventDefault(); handleBoxDrop(id); }}
-    >
-      <div className="draggable-box__handle" title="Arraste para reposicionar">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-          <circle cx="8" cy="5" r="1.6" /><circle cx="16" cy="5" r="1.6" />
-          <circle cx="8" cy="12" r="1.6" /><circle cx="16" cy="12" r="1.6" />
-          <circle cx="8" cy="19" r="1.6" /><circle cx="16" cy="19" r="1.6" />
-        </svg>
+  const DraggableBox = ({ id, children }: { id: string; children: ReactNode }) => {
+    const span = overviewSpans[id] || 4;
+    return (
+      <div
+        className={[
+          "draggable-box",
+          draggedKey === id ? "draggable-box--dragging" : "",
+          dragOverKey === id && draggedKey !== id ? "draggable-box--over" : "",
+        ].filter(Boolean).join(" ")}
+        style={{ gridColumn: `span ${span}` }}
+        draggable
+        onDragStart={() => setDraggedKey(id)}
+        onDragEnd={() => { setDraggedKey(null); setDragOverKey(null); }}
+        onDragOver={(e) => { e.preventDefault(); if (dragOverKey !== id) setDragOverKey(id); }}
+        onDrop={(e) => { e.preventDefault(); handleBoxDrop(id); }}
+      >
+        <div className="draggable-box__handle">
+          <span className="draggable-box__grip" title="Arraste para reposicionar">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <circle cx="8" cy="5" r="1.6" /><circle cx="16" cy="5" r="1.6" />
+              <circle cx="8" cy="12" r="1.6" /><circle cx="16" cy="12" r="1.6" />
+              <circle cx="8" cy="19" r="1.6" /><circle cx="16" cy="19" r="1.6" />
+            </svg>
+          </span>
+          <span className="draggable-box__spans" title="Largura da caixa (em colunas de 4)">
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`draggable-box__span-btn ${span === n ? "draggable-box__span-btn--active" : ""}`}
+                onClick={() => handleSetSpan(id, n)}
+              >
+                {n}
+              </button>
+            ))}
+          </span>
+        </div>
+        {children}
       </div>
-      {children}
-    </div>
-  );
+    );
+  };
 
   const overviewSections: Record<string, ReactNode> = {
     pizza: productSalesArr.length > 0 && (
@@ -684,6 +735,7 @@ export default function ShopeePage() {
       {status?.connected && (
         <div className="shopee-period">
           <button className={`period-btn ${period === "today" ? "period-btn--active" : ""}`} onClick={() => setPeriod("today")}>Hoje</button>
+          <button className={`period-btn ${period === "yesterday" ? "period-btn--active" : ""}`} onClick={() => setPeriod("yesterday")}>Ontem</button>
           <button className={`period-btn ${period === "week" ? "period-btn--active" : ""}`} onClick={() => setPeriod("week")}>Semana</button>
           <button className={`period-btn ${period === "month" ? "period-btn--active" : ""}`} onClick={() => setPeriod("month")}>Mês</button>
           <button className={`period-btn ${period === "custom" ? "period-btn--active" : ""}`} onClick={() => setPeriod("custom")}>Período</button>
@@ -726,22 +778,28 @@ export default function ShopeePage() {
             </div>
           ) : (
             <>
-              {overviewOrder.length !== DEFAULT_OVERVIEW_ORDER.length ||
-                !DEFAULT_OVERVIEW_ORDER.every((k, i) => overviewOrder[i] === k) ? (
-                <button className="btn-reset-layout" onClick={() => setOverviewOrder(DEFAULT_OVERVIEW_ORDER)}>
-                  Restaurar ordem padrão
+              {(overviewOrder.length !== DEFAULT_OVERVIEW_ORDER.length ||
+                !DEFAULT_OVERVIEW_ORDER.every((k, i) => overviewOrder[i] === k) ||
+                Object.keys(DEFAULT_OVERVIEW_SPANS).some((k) => overviewSpans[k] !== DEFAULT_OVERVIEW_SPANS[k])) && (
+                <button
+                  className="btn-reset-layout"
+                  onClick={() => { setOverviewOrder(DEFAULT_OVERVIEW_ORDER); setOverviewSpans(DEFAULT_OVERVIEW_SPANS); }}
+                >
+                  Restaurar layout padrão
                 </button>
-              ) : null}
+              )}
 
-              {overviewOrder.map((key) => {
-                const content = overviewSections[key];
-                if (!content) return null;
-                return (
-                  <DraggableBox key={key} id={key}>
-                    {content}
-                  </DraggableBox>
-                );
-              })}
+              <div className="overview-grid">
+                {overviewOrder.map((key) => {
+                  const content = overviewSections[key];
+                  if (!content) return null;
+                  return (
+                    <DraggableBox key={key} id={key}>
+                      {content}
+                    </DraggableBox>
+                  );
+                })}
+              </div>
             </>
           )}
         </div>

@@ -227,8 +227,17 @@
   color: #ee4d2d;
 }
 
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .draggable-box {
   position: relative;
+  grid-column: span 4;
+  min-width: 0;
   transition: opacity 0.15s;
 }
 
@@ -245,14 +254,15 @@
 .draggable-box__handle {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 20px;
+  justify-content: space-between;
+  gap: 8px;
+  height: 22px;
   margin-bottom: 6px;
+  padding: 0 6px;
   border-radius: 6px;
   background: #f3f4f6;
-  color: #9ca3af;
   cursor: grab;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s;
 }
 
 .draggable-box__handle:active {
@@ -261,11 +271,59 @@
 
 .draggable-box__handle:hover {
   background: #fee2e2;
+}
+
+.draggable-box__grip {
+  display: flex;
+  align-items: center;
+  color: #9ca3af;
+}
+
+.draggable-box__handle:hover .draggable-box__grip {
   color: #ee4d2d;
+}
+
+.draggable-box__spans {
+  display: flex;
+  gap: 2px;
+}
+
+.draggable-box__span-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 0.62rem;
+  line-height: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.draggable-box__span-btn:hover {
+  background: #fecaca;
+  color: #dc2626;
+}
+
+.draggable-box__span-btn--active {
+  background: #ee4d2d;
+  color: #fff;
 }
 
 .overview-summary-box {
   display: contents;
+}
+
+@media (max-width: 900px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .draggable-box {
+    grid-column: 1 / -1 !important;
+  }
 }
 
 /* Tooltip do gráfico de pizza (Vendas por Produto) */
