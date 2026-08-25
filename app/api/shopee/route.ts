@@ -431,11 +431,14 @@ export async function POST(req: NextRequest) {
   // Salvar credenciais
   if (action === "save_credentials") {
     const config = getConfig();
-    config.partnerId = Number(body.partnerId) || 0;
-    config.partnerKey = body.partnerKey || "";
-    config.shopId = Number(body.shopId) || 0;
-    config.baseUrl = body.baseUrl || "https://openplatform.shopee.com.br";
-    config.taxRate = Number(body.taxRate) || 12;
+    // Campos em branco mantêm o valor já salvo — a Partner Key nunca volta pro
+    // formulário (por segurança), então reenviar o formulário sem digitá-la de
+    // novo não pode apagar a chave real.
+    if (body.partnerId) config.partnerId = Number(body.partnerId) || config.partnerId;
+    if (body.partnerKey) config.partnerKey = body.partnerKey;
+    if (body.shopId) config.shopId = Number(body.shopId) || config.shopId;
+    if (body.baseUrl) config.baseUrl = body.baseUrl;
+    if (body.taxRate !== undefined && body.taxRate !== "") config.taxRate = Number(body.taxRate);
     saveConfig(config);
     return NextResponse.json({ success: true });
   }

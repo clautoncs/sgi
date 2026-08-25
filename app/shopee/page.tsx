@@ -777,7 +777,7 @@ export default function ShopeePage() {
                   type="password"
                   value={partnerKey}
                   onChange={e => setPartnerKey(e.target.value)}
-                  placeholder="Chave secreta do app"
+                  placeholder={status?.hasCredentials ? "Deixe em branco para manter a chave atual" : "Chave secreta do app"}
                 />
               </div>
               <div className="form-group">
