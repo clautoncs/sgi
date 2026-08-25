@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import type { ReactNode } from "react";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import "./shopee.css";
@@ -265,16 +265,22 @@ export default function ShopeePage() {
     return { from: from - span, to: from };
   }, [getTimeRange]);
 
+  // Cada fetch guarda seu próprio "número da vez" — se a resposta chegar
+  // depois de uma busca mais nova ter começado (troca rápida de período),
+  // ela é descartada em vez de sobrescrever o estado com dado do período errado.
+  const ordersRequestId = useRef(0);
   const fetchOrders = useCallback(async () => {
     if (!status?.connected) return;
+    const myRequestId = ++ordersRequestId.current;
     setLoadingData(true);
     try {
       const { from, to } = getTimeRange();
       const res = await fetch(`/api/shopee?action=orders&time_from=${from}&time_to=${to}`);
       const data = await res.json();
+      if (myRequestId !== ordersRequestId.current) return;
       setOrders(data.orders || []);
     } catch { /* ignore */ }
-    finally { setLoadingData(false); }
+    finally { if (myRequestId === ordersRequestId.current) setLoadingData(false); }
   }, [status, getTimeRange]);
 
   const fetchProducts = useCallback(async () => {
@@ -288,22 +294,28 @@ export default function ShopeePage() {
     finally { setLoadingData(false); }
   }, [status]);
 
+  const prevOrdersRequestId = useRef(0);
   const fetchPreviousOrders = useCallback(async () => {
     if (!status?.connected) return;
+    const myRequestId = ++prevOrdersRequestId.current;
     try {
       const { from, to } = getPreviousTimeRange();
       const res = await fetch(`/api/shopee?action=orders&time_from=${from}&time_to=${to}`);
       const data = await res.json();
+      if (myRequestId !== prevOrdersRequestId.current) return;
       setPrevOrders(data.orders || []);
     } catch { /* ignore */ }
   }, [status, getPreviousTimeRange]);
 
+  const financeRequestId = useRef(0);
   const fetchFinance = useCallback(async () => {
     if (!status?.connected) return;
+    const myRequestId = ++financeRequestId.current;
     try {
       const { from, to } = getTimeRange();
       const res = await fetch(`/api/shopee?action=finance&time_from=${from}&time_to=${to}`);
       const data = await res.json();
+      if (myRequestId !== financeRequestId.current) return;
       setEscrowList(data.escrowList || []);
     } catch { /* ignore */ }
   }, [status, getTimeRange]);
