@@ -33,6 +33,7 @@ model User {
   roleId        String
   sessions      Session[]
   auditLogs     AuditLog[]
+  trackingOrders TrackingOrder[]
 
   @@map("users")
 }
@@ -167,6 +168,31 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+// ============================================================
+// RASTREIO DE PEDIDOS (fornecedores / compras internacionais)
+// ============================================================
+
+model TrackingOrder {
+  id             String    @id @default(cuid())
+  trackingCode   String             // ex: NN349720023BR
+  supplier       String             // fornecedor: AliExpress, Shein, etc.
+  productName    String?            // produto vinculado
+  amountPaid     Float?             // valor pago
+  expectedDate   DateTime?          // previsão de entrega
+  notes          String?  @db.Text
+  status         String?            // último status conhecido (cache)
+  statusDetails  String?  @db.Text  // JSON com histórico de eventos retornado pela API
+  lastCheckedAt  DateTime?
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  createdBy      User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById    String?
+
+  @@map("tracking_orders")
 }
 
 // ============================================================

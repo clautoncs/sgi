@@ -19,6 +19,7 @@ export default function DashboardLayout({
   const showDashboard = hasPermission('dashboard.painel');
   const showVendas = hasPermission('dashboard.vendas');
     const showShopee = hasPermission("dashboard.shopee");
+  const showRastreio = hasPermission("dashboard.rastreio");
   const showEstoque = hasPermission('estoque.catalogo');
   const showMetas = hasPermission('config.metas');
   const showIntegracoes = hasPermission('config.integracoes');
@@ -77,6 +78,15 @@ export default function DashboardLayout({
                   <path d="M16 10a4 4 0 0 1-8 0"/>
                 </svg>
                 {sidebarOpen && <span>Shopee</span>}
+              </a>
+            )}
+            {showRastreio && (
+              <a href="/rastreio" className="nav-item">
+                <svg className="nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 6v6l4 2"/>
+                </svg>
+                {sidebarOpen && <span>Rastreio</span>}
               </a>
             )}
           </div>

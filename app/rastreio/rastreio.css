@@ -1,0 +1,229 @@
+.rastreio-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.rastreio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.rastreio-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.rastreio-btn-novo {
+  background: #ee4d2d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rastreio-btn-novo:hover {
+  background: #d63d1f;
+}
+
+.rastreio-filtros {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.rastreio-filtro-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e2e2);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.rastreio-filtro-btn.active {
+  background: #ee4d2d;
+  color: #fff;
+  border-color: #ee4d2d;
+}
+
+.rastreio-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rastreio-card {
+  border: 1px solid var(--border-color, #e2e2e2);
+  border-radius: 10px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.rastreio-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rastreio-card-codigo {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.rastreio-card-info {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-muted, #666);
+}
+
+.rastreio-card-notas {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+  font-style: italic;
+}
+
+.rastreio-card-acoes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.rastreio-status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rastreio-status-badge.status-indisponivel,
+.rastreio-status-badge.status-aguardando_consulta {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.rastreio-status-badge.status-entregue {
+  background: #d4edda;
+  color: #155724;
+}
+
+.rastreio-status-badge.status-em_transito,
+.rastreio-status-badge.status-em_transporte {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.rastreio-status-badge.status-desconhecido {
+  background: #e2e3e5;
+  color: #383d41;
+}
+
+.rastreio-card-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.rastreio-card-btns button {
+  border: none;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.rastreio-card-btns button:hover {
+  background: var(--bg-hover, #ebebeb);
+}
+
+.rastreio-vazio,
+.rastreio-loading {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--text-muted, #666);
+}
+
+.rastreio-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.rastreio-modal {
+  background: var(--bg-primary, #fff);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.rastreio-modal h3 {
+  margin-bottom: 16px;
+}
+
+.rastreio-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.rastreio-form-group label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rastreio-form-group input,
+.rastreio-form-group textarea {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ccc);
+  font-size: 14px;
+}
+
+.rastreio-modal-acoes {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.rastreio-modal-acoes button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.rastreio-btn-salvar {
+  background: #ee4d2d;
+  color: #fff;
+}
+
+.rastreio-btn-cancelar {
+  background: var(--bg-secondary, #f0f0f0);
+}
+
+.rastreio-error {
+  color: #c0392b;
+  font-size: 13px;
+  margin-top: 8px;
+}

@@ -46,6 +46,11 @@
       "code": "admin.permissoes",
       "label": "Gerenciar Permissões",
       "module": "Administração"
+    },
+    {
+      "code": "dashboard.rastreio",
+      "label": "Rastreio de Pedidos",
+      "module": "Dashboard"
     }
   ],
   "estoqueProfiles": [
@@ -133,6 +138,12 @@
           "view": true,
           "edit": true,
           "manage": true
+        },
+        {
+          "page": "dashboard.rastreio",
+          "view": true,
+          "edit": true,
+          "manage": true
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -201,6 +212,12 @@
         },
         {
           "page": "dashboard.shopee",
+          "view": true,
+          "edit": true,
+          "manage": true
+        },
+        {
+          "page": "dashboard.rastreio",
           "view": true,
           "edit": true,
           "manage": true
@@ -275,6 +292,12 @@
           "view": false,
           "edit": false,
           "manage": false
+        },
+        {
+          "page": "dashboard.rastreio",
+          "view": false,
+          "edit": false,
+          "manage": false
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -346,6 +369,12 @@
           "view": false,
           "edit": false,
           "manage": false
+        },
+        {
+          "page": "dashboard.rastreio",
+          "view": false,
+          "edit": false,
+          "manage": false
         }
       ],
       "createdAt": "2026-07-01T00:00:00.000Z"
@@ -414,6 +443,12 @@
         },
         {
           "page": "dashboard.shopee",
+          "view": false,
+          "edit": false,
+          "manage": false
+        },
+        {
+          "page": "dashboard.rastreio",
           "view": false,
           "edit": false,
           "manage": false
