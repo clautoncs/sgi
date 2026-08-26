@@ -477,11 +477,15 @@ export default function ShopeePage() {
       productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * (item.model_quantity_purchased || 1);
     });
   });
+  const totalUnitsSold = Object.values(productSales).reduce((sum, p) => sum + p.qty, 0);
+  const adsPerUnit = totalUnitsSold > 0 ? adsExpense / totalUnitsSold : 0;
+
   const productSalesArr = Object.values(productSales)
     .map((p) => {
       const hasCost = Object.prototype.hasOwnProperty.call(costs, p.itemId);
       const cost = hasCost ? costs[p.itemId] * p.qty : p.revenue * 0.40;
-      return { ...p, hasCost, cost };
+      const adsCost = p.qty * adsPerUnit;
+      return { ...p, hasCost, cost, adsCost };
     })
     .sort((a, b) => b.revenue - a.revenue);
 
@@ -489,7 +493,7 @@ export default function ShopeePage() {
   const productsWithCostCount = productSalesArr.filter((p) => p.hasCost).length;
   const costCoveragePct = productSalesArr.length > 0 ? (productsWithCostCount / productSalesArr.length) * 100 : 0;
 
-  const netProfit = totalRevenue - totalCost - totalTax - shopeeCommission - totalShipping;
+  const netProfit = totalRevenue - totalCost - totalTax - shopeeCommission - totalShipping - adsExpense;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   const pct = (v: number) => (totalRevenue > 0 ? (v / totalRevenue) * 100 : 0);
 
@@ -499,13 +503,14 @@ export default function ShopeePage() {
   const pieTop = productSalesArr.slice(0, PIE_TOP_N);
   const pieRest = productSalesArr.slice(PIE_TOP_N);
   const pieData = [
-    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, hasCost: p.hasCost })),
+    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, adsCost: p.adsCost, hasCost: p.hasCost })),
     ...(pieRest.length > 0
       ? [{
           name: `Outros (${pieRest.length} produtos)`,
           revenue: pieRest.reduce((s, p) => s + p.revenue, 0),
           qty: pieRest.reduce((s, p) => s + p.qty, 0),
           cost: pieRest.reduce((s, p) => s + p.cost, 0),
+          adsCost: pieRest.reduce((s, p) => s + p.adsCost, 0),
           hasCost: false,
         }]
       : []),
@@ -527,7 +532,8 @@ export default function ShopeePage() {
         const cost = hasCost ? costs[costKey] * qty : subtotal * 0.40;
         const lineTax = subtotal * tax;
         const lineComm = subtotal * 0.20;
-        const profit = subtotal - cost - lineTax - lineComm;
+        const lineAds = qty * adsPerUnit;
+        const profit = subtotal - cost - lineTax - lineComm - lineAds;
         const margin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
         return {
           orderSn: order.order_sn,
@@ -540,6 +546,7 @@ export default function ShopeePage() {
           cost,
           tax: lineTax,
           commission: lineComm,
+          ads: lineAds,
           profit,
           margin,
         };
@@ -654,7 +661,7 @@ export default function ShopeePage() {
     const pctOfTotal = totalRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
     const dTax = d.revenue * tax;
     const dComm = d.revenue * 0.20;
-    const dProfit = d.revenue - d.cost - dTax - dComm;
+    const dProfit = d.revenue - d.cost - dTax - dComm - (d.adsCost || 0);
     const dMargin = d.revenue > 0 ? (dProfit / d.revenue) * 100 : 0;
     return (
       <div className="pie-tooltip">
@@ -662,6 +669,7 @@ export default function ShopeePage() {
         <span>{fmt(d.revenue)} · {pctOfTotal.toFixed(1)}% da receita</span>
         <span>{d.qty} unidade{d.qty === 1 ? "" : "s"} vendida{d.qty === 1 ? "" : "s"}</span>
         <span>Custo: {fmt(d.cost)}{!d.hasCost && " (estimado)"}</span>
+        <span>Ads (rateado): {fmt(d.adsCost || 0)}</span>
         <span className={dMargin >= 0 ? "text-success" : "text-danger"}>Margem: {dMargin.toFixed(1)}%</span>
       </div>
     );
@@ -778,7 +786,7 @@ export default function ShopeePage() {
           <div className="ov-card ov-card--commission">
             <span className="ov-card__label">Investido em Ads</span>
             <span className="ov-card__value">{fmt(adsExpense)}</span>
-            <span className="ov-card__sub">{pct(adsExpense).toFixed(1)}% da receita (dado real da Shopee)</span>
+            <span className="ov-card__sub">{pct(adsExpense).toFixed(1)}% da receita · já descontado do lucro</span>
           </div>
           <div className="ov-card ov-card--ticket">
             <span className="ov-card__label">TACOS</span>
@@ -840,6 +848,7 @@ export default function ShopeePage() {
                 <th>Custo</th>
                 <th>Imposto</th>
                 <th>Comissão</th>
+                <th>Ads</th>
                 <th>Lucro</th>
                 <th>Margem</th>
               </tr>
@@ -848,7 +857,7 @@ export default function ShopeePage() {
               {productSalesArr.slice(0, 20).map((p, i) => {
                 const pTax = p.revenue * tax;
                 const pComm = p.revenue * 0.20;
-                const pProfit = p.revenue - p.cost - pTax - pComm;
+                const pProfit = p.revenue - p.cost - pTax - pComm - p.adsCost;
                 const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
                 return (
                   <tr key={p.itemId}>
@@ -862,6 +871,7 @@ export default function ShopeePage() {
                     </td>
                     <td className="text-danger">{fmt(pTax)}</td>
                     <td className="text-danger">{fmt(pComm)}</td>
+                    <td className="text-danger">{fmt(p.adsCost)}</td>
                     <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
                     <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
                   </tr>
@@ -893,6 +903,7 @@ export default function ShopeePage() {
                   <th>Custo</th>
                   <th>Imposto</th>
                   <th>Comissão</th>
+                  <th>Ads</th>
                   <th>Lucro</th>
                   <th>Margem</th>
                 </tr>
@@ -912,6 +923,7 @@ export default function ShopeePage() {
                     </td>
                     <td className="text-danger">{fmt(s.tax)}</td>
                     <td className="text-danger">{fmt(s.commission)}</td>
+                    <td className="text-danger">{fmt(s.ads)}</td>
                     <td className={s.profit >= 0 ? "text-success" : "text-danger"}>{fmt(s.profit)}</td>
                     <td className={s.margin >= 0 ? "text-success" : "text-danger"}>{s.margin.toFixed(1)}%</td>
                   </tr>
