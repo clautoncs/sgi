@@ -96,6 +96,7 @@ export default function ShopeePage() {
   const [prevOrders, setPrevOrders] = useState<Order[]>([]);
   const [escrowList, setEscrowList] = useState<any[]>([]);
   const [adsExpense, setAdsExpense] = useState(0);
+  const [adsExpenseByProduct, setAdsExpenseByProduct] = useState<Record<string, number>>({});
   const [costs, setCosts] = useState<Record<string, number>>({});
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [productModels, setProductModels] = useState<Record<string, ProductModel[]>>({});
@@ -345,6 +346,19 @@ export default function ShopeePage() {
     } catch { /* ignore */ }
   }, [status, getTimeRange]);
 
+  const adsByProductRequestId = useRef(0);
+  const fetchAdsByProduct = useCallback(async () => {
+    if (!status?.connected) return;
+    const myRequestId = ++adsByProductRequestId.current;
+    try {
+      const { from, to } = getTimeRange();
+      const res = await fetch(`/api/shopee?action=ads_by_product&time_from=${from}&time_to=${to}`);
+      const data = await res.json();
+      if (myRequestId !== adsByProductRequestId.current) return;
+      setAdsExpenseByProduct(data.expenseByItem || {});
+    } catch { /* ignore */ }
+  }, [status, getTimeRange]);
+
   // Conta quantas das buscas do lote atual (pedidos, produtos, financeiro...)
   // já terminaram, pra mostrar uma porcentagem real de progresso em vez de
   // só um "carregando" genérico.
@@ -377,14 +391,14 @@ export default function ShopeePage() {
     if (!status?.connected) return;
     if (activeTab === "orders") trackProgress([fetchOrders()]);
     if (activeTab === "products") trackProgress([fetchProducts()]);
-    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend(), fetchAdsByProduct()]);
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
   const handleRefresh = () => {
     if (activeTab === "orders") trackProgress([fetchOrders()]);
     if (activeTab === "products") trackProgress([fetchProducts()]);
-    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend(), fetchAdsByProduct()]);
     if (activeTab === "dashboard") fetchDashboardData();
   };
 
@@ -459,32 +473,39 @@ export default function ShopeePage() {
   const productHasModel: Record<string, boolean> = {};
   products.forEach((p) => { productHasModel[String(p.item_id)] = !!p.has_model; });
 
-  const productSales: Record<string, { itemId: string; name: string; qty: number; revenue: number }> = {};
+  const productSales: Record<string, { itemId: string; baseItemId: string; name: string; qty: number; revenue: number }> = {};
+  const qtyByBaseItem: Record<string, number> = {};
   filteredOrders.forEach((order) => {
     (order.item_list || []).forEach((item: any) => {
       // Produtos com variação usam custo por variação (item+model); sem
       // variação, a chave é só o item_id — mesmo esquema usado ao salvar
       // o custo na aba Produtos.
-      const isVariation = productHasModel[String(item.item_id)] && item.model_id;
-      const key = isVariation ? `${item.item_id}:${item.model_id}` : String(item.item_id);
+      const baseItemId = String(item.item_id);
+      const isVariation = productHasModel[baseItemId] && item.model_id;
+      const key = isVariation ? `${item.item_id}:${item.model_id}` : baseItemId;
       const name = isVariation && item.model_name
         ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
         : (item.item_name || `Produto #${item.item_id}`);
       if (!productSales[key]) {
-        productSales[key] = { itemId: key, name, qty: 0, revenue: 0 };
+        productSales[key] = { itemId: key, baseItemId, name, qty: 0, revenue: 0 };
       }
-      productSales[key].qty += item.model_quantity_purchased || 1;
-      productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * (item.model_quantity_purchased || 1);
+      const qty = item.model_quantity_purchased || 1;
+      productSales[key].qty += qty;
+      productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * qty;
+      qtyByBaseItem[baseItemId] = (qtyByBaseItem[baseItemId] || 0) + qty;
     });
   });
-  const totalUnitsSold = Object.values(productSales).reduce((sum, p) => sum + p.qty, 0);
-  const adsPerUnit = totalUnitsSold > 0 ? adsExpense / totalUnitsSold : 0;
 
+  // Ads é investido no anúncio do produto (item_id), não por variação — então
+  // o gasto real do item é rateado entre as variações proporcional à
+  // quantidade vendida de cada uma. Sem gasto registrado nesse produto, fica 0.
   const productSalesArr = Object.values(productSales)
     .map((p) => {
       const hasCost = Object.prototype.hasOwnProperty.call(costs, p.itemId);
       const cost = hasCost ? costs[p.itemId] * p.qty : p.revenue * 0.40;
-      const adsCost = p.qty * adsPerUnit;
+      const itemAdsTotal = adsExpenseByProduct[p.baseItemId] || 0;
+      const itemQtyTotal = qtyByBaseItem[p.baseItemId] || 0;
+      const adsCost = itemQtyTotal > 0 ? itemAdsTotal * (p.qty / itemQtyTotal) : 0;
       return { ...p, hasCost, cost, adsCost };
     })
     .sort((a, b) => b.revenue - a.revenue);
@@ -523,8 +544,9 @@ export default function ShopeePage() {
         const qty = item.model_quantity_purchased || 1;
         const unitPrice = item.model_discounted_price || item.model_original_price || 0;
         const subtotal = unitPrice * qty;
-        const isVariation = productHasModel[String(item.item_id)] && item.model_id;
-        const costKey = isVariation ? `${item.item_id}:${item.model_id}` : String(item.item_id);
+        const baseItemId = String(item.item_id);
+        const isVariation = productHasModel[baseItemId] && item.model_id;
+        const costKey = isVariation ? `${item.item_id}:${item.model_id}` : baseItemId;
         const name = isVariation && item.model_name
           ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
           : (item.item_name || `Produto #${item.item_id}`);
@@ -532,7 +554,9 @@ export default function ShopeePage() {
         const cost = hasCost ? costs[costKey] * qty : subtotal * 0.40;
         const lineTax = subtotal * tax;
         const lineComm = subtotal * 0.20;
-        const lineAds = qty * adsPerUnit;
+        const itemAdsTotal = adsExpenseByProduct[baseItemId] || 0;
+        const itemQtyTotal = qtyByBaseItem[baseItemId] || 0;
+        const lineAds = itemQtyTotal > 0 ? itemAdsTotal * (qty / itemQtyTotal) : 0;
         const profit = subtotal - cost - lineTax - lineComm - lineAds;
         const margin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
         return {

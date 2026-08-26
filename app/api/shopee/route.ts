@@ -291,6 +291,82 @@ async function fetchAllAdsPerformance(
   return days;
 }
 
+const CAMPAIGN_BATCH_SIZE = 100;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
+
+// Gasto real de Ads por produto: cruza a lista de campanhas "product ads"
+// (uma campanha manual = um item_id) com a performance diária de cada uma,
+// somando o expense de todas as campanhas que já tiveram esse produto.
+async function fetchAdsExpenseByProduct(
+  config: ShopeeConfig,
+  timeFrom: number,
+  timeTo: number
+): Promise<Record<string, number>> {
+  const expenseByItem: Record<string, number> = {};
+
+  const campaignIds: number[] = [];
+  let hasNextPage = true;
+  let offset = 0;
+  let pages = 0;
+  while (hasNextPage && pages < MAX_PAGES) {
+    const data = await shopeeRequest(config, "/api/v2/ads/get_product_level_campaign_id_list", {
+      ad_type: "all",
+      offset: String(offset),
+      page_size: "100",
+    });
+    const list = data.response?.campaign_list || [];
+    campaignIds.push(...list.map((c: any) => c.campaign_id));
+    hasNextPage = !!data.response?.has_next_page;
+    offset += list.length;
+    pages++;
+    if (list.length === 0) break;
+  }
+  if (campaignIds.length === 0) return expenseByItem;
+
+  // Mapear campaign_id -> item_id (campanhas manuais de produto = 1 item cada)
+  const campaignToItems: Record<number, number[]> = {};
+  for (const batch of chunkArray(campaignIds, CAMPAIGN_BATCH_SIZE)) {
+    const info = await shopeeRequest(config, "/api/v2/ads/get_product_level_campaign_setting_info", {
+      campaign_id_list: batch.join(","),
+      info_type_list: "1",
+    });
+    for (const c of info.response?.campaign_list || []) {
+      campaignToItems[c.campaign_id] = c.common_info?.item_id_list || [];
+    }
+  }
+
+  // Somar o expense de cada campanha no período (respeitando o limite de
+  // janela de datas), e distribuir pros item_id(s) daquela campanha.
+  for (const batch of chunkArray(campaignIds, CAMPAIGN_BATCH_SIZE)) {
+    let windowStart = timeFrom;
+    while (windowStart < timeTo) {
+      const windowEnd = Math.min(windowStart + ADS_MAX_WINDOW, timeTo);
+      const perf = await shopeeRequest(config, "/api/v2/ads/get_product_campaign_daily_performance", {
+        start_date: toBrDateStr(windowStart),
+        end_date: toBrDateStr(windowEnd),
+        campaign_id_list: batch.join(","),
+      });
+      for (const camp of perf.response?.campaign_list || []) {
+        const totalExpense = (camp.metrics_list || []).reduce((s: number, m: any) => s + (m.expense || 0), 0);
+        const items = campaignToItems[camp.campaign_id] || [];
+        if (items.length === 0 || totalExpense === 0) continue;
+        const perItem = totalExpense / items.length;
+        for (const itemId of items) {
+          expenseByItem[String(itemId)] = (expenseByItem[String(itemId)] || 0) + perItem;
+        }
+      }
+      windowStart = windowEnd + 86400;
+    }
+  }
+
+  return expenseByItem;
+}
+
 export async function GET(req: NextRequest) {
   const denied = await requireSession();
   if (denied) return denied;
@@ -451,6 +527,22 @@ export async function GET(req: NextRequest) {
     const totalBroadGmv = days.reduce((sum, d) => sum + (d.broad_gmv || 0), 0);
 
     return NextResponse.json({ days, totalExpense, totalDirectGmv, totalBroadGmv });
+  }
+
+  // Gasto real de Ads por produto (não rateado) no período
+  if (action === "ads_by_product") {
+    let config = getConfig();
+    if (!config.connected) {
+      return NextResponse.json({ error: "Shopee não conectada" }, { status: 400 });
+    }
+    config = await ensureValidToken(config);
+
+    const timeFrom = Number(searchParams.get("time_from")) || Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const timeTo = Number(searchParams.get("time_to")) || Math.floor(Date.now() / 1000);
+
+    const expenseByItem = await fetchAdsExpenseByProduct(config, timeFrom, timeTo);
+
+    return NextResponse.json({ expenseByItem });
   }
 
   // Buscar detalhes financeiros de um pedido
