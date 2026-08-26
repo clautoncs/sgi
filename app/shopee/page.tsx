@@ -95,6 +95,7 @@ export default function ShopeePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [prevOrders, setPrevOrders] = useState<Order[]>([]);
   const [escrowList, setEscrowList] = useState<any[]>([]);
+  const [adsExpense, setAdsExpense] = useState(0);
   const [costs, setCosts] = useState<Record<string, number>>({});
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [productModels, setProductModels] = useState<Record<string, ProductModel[]>>({});
@@ -331,6 +332,19 @@ export default function ShopeePage() {
     } catch { /* ignore */ }
   }, [status, getTimeRange]);
 
+  const adsRequestId = useRef(0);
+  const fetchAdsSpend = useCallback(async () => {
+    if (!status?.connected) return;
+    const myRequestId = ++adsRequestId.current;
+    try {
+      const { from, to } = getTimeRange();
+      const res = await fetch(`/api/shopee?action=ads_performance&time_from=${from}&time_to=${to}`);
+      const data = await res.json();
+      if (myRequestId !== adsRequestId.current) return;
+      setAdsExpense(data.totalExpense || 0);
+    } catch { /* ignore */ }
+  }, [status, getTimeRange]);
+
   // Conta quantas das buscas do lote atual (pedidos, produtos, financeiro...)
   // já terminaram, pra mostrar uma porcentagem real de progresso em vez de
   // só um "carregando" genérico.
@@ -363,14 +377,14 @@ export default function ShopeePage() {
     if (!status?.connected) return;
     if (activeTab === "orders") trackProgress([fetchOrders()]);
     if (activeTab === "products") trackProgress([fetchProducts()]);
-    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend()]);
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
   const handleRefresh = () => {
     if (activeTab === "orders") trackProgress([fetchOrders()]);
     if (activeTab === "products") trackProgress([fetchProducts()]);
-    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts()]);
+    if (activeTab === "overview") trackProgress([fetchOrders(), fetchProducts(), fetchAdsSpend()]);
     if (activeTab === "dashboard") fetchDashboardData();
   };
 
@@ -760,6 +774,16 @@ export default function ShopeePage() {
             <span className="ov-card__label">Custo dos Produtos</span>
             <span className="ov-card__value">{fmt(totalCost)}</span>
             <span className="ov-card__sub">{pct(totalCost).toFixed(1)}% da receita · {productsWithCostCount}/{productSalesArr.length} produtos com custo cadastrado</span>
+          </div>
+          <div className="ov-card ov-card--commission">
+            <span className="ov-card__label">Investido em Ads</span>
+            <span className="ov-card__value">{fmt(adsExpense)}</span>
+            <span className="ov-card__sub">{pct(adsExpense).toFixed(1)}% da receita (dado real da Shopee)</span>
+          </div>
+          <div className="ov-card ov-card--ticket">
+            <span className="ov-card__label">TACOS</span>
+            <span className="ov-card__value">{totalRevenue > 0 ? `${((adsExpense / totalRevenue) * 100).toFixed(1)}%` : "—"}</span>
+            <span className="ov-card__sub">Ads ÷ Faturamento — quanto da receita virou anúncio</span>
           </div>
           <div className={`ov-card ${netProfit >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
             <span className="ov-card__label">Lucro Líquido</span>

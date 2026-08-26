@@ -250,6 +250,47 @@ async function fetchAllEscrowList(
   return escrowList;
 }
 
+// get_all_cpc_ads_daily_performance exige data em DD-MM-YYYY (fuso de
+// Brasília) e não aceita janela maior que 1 mês por chamada.
+const ADS_MAX_WINDOW = 29 * 24 * 3600;
+
+function toBrDateStr(epochSeconds: number): string {
+  const d = new Date(epochSeconds * 1000);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === "day")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const year = parts.find((p) => p.type === "year")?.value;
+  return `${day}-${month}-${year}`;
+}
+
+async function fetchAllAdsPerformance(
+  config: ShopeeConfig,
+  timeFrom: number,
+  timeTo: number
+): Promise<any[]> {
+  const days: any[] = [];
+  let windowStart = timeFrom;
+  let iterations = 0;
+
+  while (windowStart < timeTo && iterations < MAX_PAGES) {
+    const windowEnd = Math.min(windowStart + ADS_MAX_WINDOW, timeTo);
+    const data = await shopeeRequest(config, "/api/v2/ads/get_all_cpc_ads_daily_performance", {
+      start_date: toBrDateStr(windowStart),
+      end_date: toBrDateStr(windowEnd),
+    });
+    if (Array.isArray(data.response)) days.push(...data.response);
+    windowStart = windowEnd + 86400; // próximo dia, pra não repetir o último dia da janela anterior
+    iterations++;
+  }
+
+  return days;
+}
+
 export async function GET(req: NextRequest) {
   const denied = await requireSession();
   if (denied) return denied;
@@ -391,6 +432,25 @@ export async function GET(req: NextRequest) {
       escrowList,
       total: escrowList.length,
     });
+  }
+
+  // Performance de anúncios (gasto real com Ads) no período
+  if (action === "ads_performance") {
+    let config = getConfig();
+    if (!config.connected) {
+      return NextResponse.json({ error: "Shopee não conectada" }, { status: 400 });
+    }
+    config = await ensureValidToken(config);
+
+    const timeFrom = Number(searchParams.get("time_from")) || Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    const timeTo = Number(searchParams.get("time_to")) || Math.floor(Date.now() / 1000);
+
+    const days = await fetchAllAdsPerformance(config, timeFrom, timeTo);
+    const totalExpense = days.reduce((sum, d) => sum + (d.expense || 0), 0);
+    const totalDirectGmv = days.reduce((sum, d) => sum + (d.direct_gmv || 0), 0);
+    const totalBroadGmv = days.reduce((sum, d) => sum + (d.broad_gmv || 0), 0);
+
+    return NextResponse.json({ days, totalExpense, totalDirectGmv, totalBroadGmv });
   }
 
   // Buscar detalhes financeiros de um pedido
