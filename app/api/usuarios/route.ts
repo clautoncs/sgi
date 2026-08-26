@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { promises as fs } from "fs";
 import path from "path";
+
+const ADMIN_ROLES = ["sysadmin", "admin"];
+
+async function requireAdmin() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+  const role = (session.user as any)?.role;
+  if (!ADMIN_ROLES.includes(role)) {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+  return null;
+}
 
 // Ler configuração de perfil padrão do roles.json
 async function getDefaultRole(): Promise<string> {
@@ -21,6 +37,9 @@ async function getDefaultRole(): Promise<string> {
 }
 
 export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const users = await prisma.user.findMany({
       include: { role: true },
@@ -51,6 +70,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { action, ...userData } = body;
