@@ -29,6 +29,10 @@ async function requireAdmin() {
 
 const CONFIG_PATH = "/app/shopee-config.json";
 const COSTS_PATH = "/app/shopee-costs.json";
+const EXTRA_COST_PATHS: Record<string, string> = {
+  freight: "/app/shopee-freight.json",
+  packaging: "/app/shopee-packaging.json",
+};
 
 function getCosts(): Record<string, number> {
   try {
@@ -41,6 +45,25 @@ function getCosts(): Record<string, number> {
 
 function saveCosts(costs: Record<string, number>) {
   fs.writeFileSync(COSTS_PATH, JSON.stringify(costs, null, 2));
+}
+
+// Frete manual (sobrepõe o rateio automático do frete real do pedido) e
+// custo de embalagem — mesmo esquema de arquivo por item_id[:model_id] do
+// getCosts/saveCosts acima, só que num arquivo por tipo.
+function getExtraCosts(type: string): Record<string, number> {
+  const path = EXTRA_COST_PATHS[type];
+  if (!path) return {};
+  try {
+    return JSON.parse(fs.readFileSync(path, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function saveExtraCosts(type: string, values: Record<string, number>) {
+  const path = EXTRA_COST_PATHS[type];
+  if (!path) return;
+  fs.writeFileSync(path, JSON.stringify(values, null, 2));
 }
 
 interface ShopeeConfig {
@@ -572,6 +595,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ costs: getCosts() });
   }
 
+  // Frete manual e custo de embalagem por produto
+  if (action === "extra_costs") {
+    const type = searchParams.get("type") || "";
+    if (!EXTRA_COST_PATHS[type]) {
+      return NextResponse.json({ error: "type inválido (use freight ou packaging)" }, { status: 400 });
+    }
+    return NextResponse.json({ costs: getExtraCosts(type) });
+  }
+
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
 }
 
@@ -597,6 +629,23 @@ export async function POST(req: NextRequest) {
     const costs = getCosts();
     costs[itemId] = cost;
     saveCosts(costs);
+    return NextResponse.json({ success: true });
+  }
+
+  // Salvar frete manual ou custo de embalagem de um produto
+  if (action === "save_extra_cost") {
+    const type = String(body.type || "");
+    const itemId = String(body.itemId || "");
+    const value = Number(body.value);
+    if (!EXTRA_COST_PATHS[type]) {
+      return NextResponse.json({ error: "type inválido (use freight ou packaging)" }, { status: 400 });
+    }
+    if (!itemId || !Number.isFinite(value) || value < 0) {
+      return NextResponse.json({ error: "itemId e value (>= 0) são obrigatórios" }, { status: 400 });
+    }
+    const values = getExtraCosts(type);
+    values[itemId] = value;
+    saveExtraCosts(type, values);
     return NextResponse.json({ success: true });
   }
 

@@ -13,5 +13,7 @@ services:
       - /root/taxas.json:/app/taxas.json
       - /root/shopee-config.json:/app/shopee-config.json
       - /root/shopee-costs.json:/app/shopee-costs.json
+      - /root/shopee-freight.json:/app/shopee-freight.json
+      - /root/shopee-packaging.json:/app/shopee-packaging.json
     ports:
       - "127.0.0.1:3000:3000"

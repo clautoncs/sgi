@@ -98,10 +98,14 @@ export default function ShopeePage() {
   const [adsExpense, setAdsExpense] = useState(0);
   const [adsExpenseByProduct, setAdsExpenseByProduct] = useState<Record<string, number>>({});
   const [costs, setCosts] = useState<Record<string, number>>({});
+  const [freightOverrides, setFreightOverrides] = useState<Record<string, number>>({});
+  const [packagingCosts, setPackagingCosts] = useState<Record<string, number>>({});
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [productModels, setProductModels] = useState<Record<string, ProductModel[]>>({});
   const [loadingModels, setLoadingModels] = useState<Set<string>>(new Set());
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
+  const [freightDrafts, setFreightDrafts] = useState<Record<string, string>>({});
+  const [packagingDrafts, setPackagingDrafts] = useState<Record<string, string>>({});
   const [savingCostId, setSavingCostId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
@@ -209,7 +213,19 @@ export default function ShopeePage() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { if (status?.connected) fetchCosts(); }, [status?.connected, fetchCosts]);
+  const fetchExtraCosts = useCallback(async () => {
+    try {
+      const [freightRes, packagingRes] = await Promise.all([
+        fetch("/api/shopee?action=extra_costs&type=freight"),
+        fetch("/api/shopee?action=extra_costs&type=packaging"),
+      ]);
+      const [freightData, packagingData] = await Promise.all([freightRes.json(), packagingRes.json()]);
+      setFreightOverrides(freightData.costs || {});
+      setPackagingCosts(packagingData.costs || {});
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { if (status?.connected) { fetchCosts(); fetchExtraCosts(); } }, [status?.connected, fetchCosts, fetchExtraCosts]);
 
   const handleToggleExpand = async (itemId: number) => {
     const key = String(itemId);
@@ -243,6 +259,22 @@ export default function ShopeePage() {
         body: JSON.stringify({ action: "save_cost", itemId, cost }),
       });
       setCosts((prev) => ({ ...prev, [itemId]: cost }));
+    } catch { /* ignore */ }
+    finally { setSavingCostId(null); }
+  };
+
+  const handleSaveExtraCost = async (type: "freight" | "packaging", itemId: string, valueStr: string) => {
+    const value = Number(valueStr.replace(",", "."));
+    if (!Number.isFinite(value) || value < 0) return;
+    setSavingCostId(`${type}:${itemId}`);
+    try {
+      await fetch("/api/shopee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_extra_cost", type, itemId, value }),
+      });
+      if (type === "freight") setFreightOverrides((prev) => ({ ...prev, [itemId]: value }));
+      else setPackagingCosts((prev) => ({ ...prev, [itemId]: value }));
     } catch { /* ignore */ }
     finally { setSavingCostId(null); }
   };
@@ -473,11 +505,12 @@ export default function ShopeePage() {
   const productHasModel: Record<string, boolean> = {};
   products.forEach((p) => { productHasModel[String(p.item_id)] = !!p.has_model; });
 
-  const productSales: Record<string, { itemId: string; baseItemId: string; name: string; qty: number; revenue: number; freight: number }> = {};
+  const productSales: Record<string, { itemId: string; baseItemId: string; name: string; qty: number; revenue: number; freight: number; packaging: number }> = {};
   const qtyByBaseItem: Record<string, number> = {};
   filteredOrders.forEach((order) => {
     // Frete é do pedido, não do item — rateado entre os itens do mesmo
-    // pedido proporcional à quantidade de cada um.
+    // pedido proporcional à quantidade de cada um, a não ser que o produto
+    // tenha um frete manual cadastrado (aí ele vence o rateio automático).
     const orderShipping = order.actual_shipping_fee || order.estimated_shipping_fee || 0;
     const orderItems = order.item_list || [];
     const orderTotalQty = orderItems.reduce((s: number, it: any) => s + (it.model_quantity_purchased || 1), 0);
@@ -492,13 +525,16 @@ export default function ShopeePage() {
         ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
         : (item.item_name || `Produto #${item.item_id}`);
       if (!productSales[key]) {
-        productSales[key] = { itemId: key, baseItemId, name, qty: 0, revenue: 0, freight: 0 };
+        productSales[key] = { itemId: key, baseItemId, name, qty: 0, revenue: 0, freight: 0, packaging: 0 };
       }
       const qty = item.model_quantity_purchased || 1;
-      const lineFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
+      const autoFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
+      const lineFreight = freightOverrides[key] !== undefined ? freightOverrides[key] * qty : autoFreight;
+      const linePackaging = packagingCosts[key] !== undefined ? packagingCosts[key] * qty : 0;
       productSales[key].qty += qty;
       productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * qty;
       productSales[key].freight += lineFreight;
+      productSales[key].packaging += linePackaging;
       qtyByBaseItem[baseItemId] = (qtyByBaseItem[baseItemId] || 0) + qty;
     });
   });
@@ -520,8 +556,12 @@ export default function ShopeePage() {
   const totalCost = productSalesArr.reduce((sum, p) => sum + p.cost, 0);
   const productsWithCostCount = productSalesArr.filter((p) => p.hasCost).length;
   const costCoveragePct = productSalesArr.length > 0 ? (productsWithCostCount / productSalesArr.length) * 100 : 0;
+  // Usa o frete ajustado (respeitando overrides manuais por produto) no
+  // lucro, mas o card "Frete Total" continua mostrando o valor real cobrado.
+  const totalFreightAdjusted = productSalesArr.reduce((sum, p) => sum + p.freight, 0);
+  const totalPackaging = productSalesArr.reduce((sum, p) => sum + p.packaging, 0);
 
-  const netProfit = totalRevenue - totalCost - totalTax - shopeeCommission - totalShipping - adsExpense;
+  const netProfit = totalRevenue - totalCost - totalTax - shopeeCommission - totalFreightAdjusted - adsExpense - totalPackaging;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   const pct = (v: number) => (totalRevenue > 0 ? (v / totalRevenue) * 100 : 0);
 
@@ -531,7 +571,7 @@ export default function ShopeePage() {
   const pieTop = productSalesArr.slice(0, PIE_TOP_N);
   const pieRest = productSalesArr.slice(PIE_TOP_N);
   const pieData = [
-    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, adsCost: p.adsCost, freight: p.freight, hasCost: p.hasCost })),
+    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, adsCost: p.adsCost, freight: p.freight, packaging: p.packaging, hasCost: p.hasCost })),
     ...(pieRest.length > 0
       ? [{
           name: `Outros (${pieRest.length} produtos)`,
@@ -540,6 +580,7 @@ export default function ShopeePage() {
           cost: pieRest.reduce((s, p) => s + p.cost, 0),
           adsCost: pieRest.reduce((s, p) => s + p.adsCost, 0),
           freight: pieRest.reduce((s, p) => s + p.freight, 0),
+          packaging: pieRest.reduce((s, p) => s + p.packaging, 0),
           hasCost: false,
         }]
       : []),
@@ -568,8 +609,10 @@ export default function ShopeePage() {
         const itemAdsTotal = adsExpenseByProduct[baseItemId] || 0;
         const itemQtyTotal = qtyByBaseItem[baseItemId] || 0;
         const lineAds = itemQtyTotal > 0 ? itemAdsTotal * (qty / itemQtyTotal) : 0;
-        const lineFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
-        const profit = subtotal - cost - lineTax - lineComm - lineAds - lineFreight;
+        const autoFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
+        const lineFreight = freightOverrides[costKey] !== undefined ? freightOverrides[costKey] * qty : autoFreight;
+        const linePackaging = packagingCosts[costKey] !== undefined ? packagingCosts[costKey] * qty : 0;
+        const profit = subtotal - cost - lineTax - lineComm - lineAds - lineFreight - linePackaging;
         const margin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
         return {
           orderSn: order.order_sn,
@@ -584,6 +627,7 @@ export default function ShopeePage() {
           commission: lineComm,
           ads: lineAds,
           freight: lineFreight,
+          packaging: linePackaging,
           profit,
           margin,
         };
@@ -698,7 +742,7 @@ export default function ShopeePage() {
     const pctOfTotal = totalRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
     const dTax = d.revenue * tax;
     const dComm = d.revenue * 0.20;
-    const dProfit = d.revenue - d.cost - dTax - dComm - (d.adsCost || 0) - (d.freight || 0);
+    const dProfit = d.revenue - d.cost - dTax - dComm - (d.adsCost || 0) - (d.freight || 0) - (d.packaging || 0);
     const dMargin = d.revenue > 0 ? (dProfit / d.revenue) * 100 : 0;
     return (
       <div className="pie-tooltip">
@@ -708,6 +752,7 @@ export default function ShopeePage() {
         <span>Custo: {fmt(d.cost)}{!d.hasCost && " (estimado)"}</span>
         <span>Ads (rateado): {fmt(d.adsCost || 0)}</span>
         <span>Frete (rateado): {fmt(d.freight || 0)}</span>
+        <span>Embalagem: {fmt(d.packaging || 0)}</span>
         <span className={dMargin >= 0 ? "text-success" : "text-danger"}>Margem: {dMargin.toFixed(1)}%</span>
       </div>
     );
@@ -831,6 +876,11 @@ export default function ShopeePage() {
             <span className="ov-card__value">{totalRevenue > 0 ? `${((adsExpense / totalRevenue) * 100).toFixed(1)}%` : "—"}</span>
             <span className="ov-card__sub">Ads ÷ Faturamento — quanto da receita virou anúncio</span>
           </div>
+          <div className="ov-card ov-card--cost">
+            <span className="ov-card__label">Embalagem</span>
+            <span className="ov-card__value">{fmt(totalPackaging)}</span>
+            <span className="ov-card__sub">Cadastrada por produto na aba Produtos</span>
+          </div>
           <div className={`ov-card ${netProfit >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
             <span className="ov-card__label">Lucro Líquido</span>
             <span className="ov-card__value">{fmt(netProfit)}</span>
@@ -888,6 +938,7 @@ export default function ShopeePage() {
                 <th>Comissão</th>
                 <th>Ads</th>
                 <th>Frete</th>
+                <th>Embalagem</th>
                 <th>Lucro</th>
                 <th>Margem</th>
               </tr>
@@ -896,7 +947,7 @@ export default function ShopeePage() {
               {productSalesArr.slice(0, 20).map((p, i) => {
                 const pTax = p.revenue * tax;
                 const pComm = p.revenue * 0.20;
-                const pProfit = p.revenue - p.cost - pTax - pComm - p.adsCost - p.freight;
+                const pProfit = p.revenue - p.cost - pTax - pComm - p.adsCost - p.freight - p.packaging;
                 const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
                 return (
                   <tr key={p.itemId}>
@@ -912,6 +963,7 @@ export default function ShopeePage() {
                     <td className="text-danger">{fmt(pComm)}</td>
                     <td className="text-danger">{fmt(p.adsCost)}</td>
                     <td className="text-danger">{fmt(p.freight)}</td>
+                    <td className="text-danger">{fmt(p.packaging)}</td>
                     <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
                     <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
                   </tr>
@@ -945,6 +997,7 @@ export default function ShopeePage() {
                   <th>Comissão</th>
                   <th>Ads</th>
                   <th>Frete</th>
+                  <th>Embalagem</th>
                   <th>Lucro</th>
                   <th>Margem</th>
                 </tr>
@@ -966,6 +1019,7 @@ export default function ShopeePage() {
                     <td className="text-danger">{fmt(s.commission)}</td>
                     <td className="text-danger">{fmt(s.ads)}</td>
                     <td className="text-danger">{fmt(s.freight)}</td>
+                    <td className="text-danger">{fmt(s.packaging)}</td>
                     <td className={s.profit >= 0 ? "text-success" : "text-danger"}>{fmt(s.profit)}</td>
                     <td className={s.margin >= 0 ? "text-success" : "text-danger"}>{s.margin.toFixed(1)}%</td>
                   </tr>
@@ -1261,6 +1315,8 @@ export default function ShopeePage() {
                   <th>Preço</th>
                   <th>Estoque</th>
                   <th>Custo</th>
+                  <th>Frete</th>
+                  <th>Embalagem</th>
                   <th>Imposto</th>
                   <th>Comissão</th>
                   <th>Lucro</th>
@@ -1273,10 +1329,14 @@ export default function ShopeePage() {
                   const hasModel = !!p.has_model;
                   const price = p.price_info?.[0]?.current_price || p.price_info?.[0]?.original_price || 0;
                   const draft = costDrafts[key] ?? (costs[key] !== undefined ? String(costs[key]) : "");
+                  const freightDraft = freightDrafts[key] ?? (freightOverrides[key] !== undefined ? String(freightOverrides[key]) : "");
+                  const packagingDraft = packagingDrafts[key] ?? (packagingCosts[key] !== undefined ? String(packagingCosts[key]) : "");
                   const costValue = costs[key];
+                  const freightValue = freightOverrides[key] ?? 0;
+                  const packagingValue = packagingCosts[key] ?? 0;
                   const priceTax = price * tax;
                   const priceComm = price * 0.20;
-                  const priceProfit = costValue !== undefined ? price - costValue - priceTax - priceComm : null;
+                  const priceProfit = costValue !== undefined ? price - costValue - priceTax - priceComm - freightValue - packagingValue : null;
                   const priceMargin = priceProfit !== null && price > 0 ? (priceProfit / price) * 100 : null;
                   const isExpanded = expandedProducts.has(key);
                   const models = productModels[key] || [];
@@ -1311,6 +1371,8 @@ export default function ShopeePage() {
                             <td className="text-muted">—</td>
                             <td className="text-muted">—</td>
                             <td className="text-muted">—</td>
+                            <td className="text-muted">—</td>
+                            <td className="text-muted">—</td>
                           </>
                         ) : (
                           <>
@@ -1329,6 +1391,32 @@ export default function ShopeePage() {
                               />
                               {savingCostId === key && <span className="cost-input__saving">salvando...</span>}
                             </td>
+                            <td>
+                              <input
+                                type="number"
+                                className="cost-input"
+                                min="0"
+                                step="0.01"
+                                placeholder="auto"
+                                value={freightDraft}
+                                onChange={(e) => setFreightDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                                onBlur={(e) => { if (e.target.value !== "") handleSaveExtraCost("freight", key, e.target.value); }}
+                              />
+                              {savingCostId === `freight:${key}` && <span className="cost-input__saving">salvando...</span>}
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                className="cost-input"
+                                min="0"
+                                step="0.01"
+                                placeholder="0,00"
+                                value={packagingDraft}
+                                onChange={(e) => setPackagingDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                                onBlur={(e) => { if (e.target.value !== "") handleSaveExtraCost("packaging", key, e.target.value); }}
+                              />
+                              {savingCostId === `packaging:${key}` && <span className="cost-input__saving">salvando...</span>}
+                            </td>
                             <td className="text-danger">{price ? fmt(priceTax) : "—"}</td>
                             <td className="text-danger">{price ? fmt(priceComm) : "—"}</td>
                             <td className={priceProfit === null ? "text-muted" : priceProfit >= 0 ? "text-success" : "text-danger"}>
@@ -1342,7 +1430,7 @@ export default function ShopeePage() {
                       </tr>
                       {hasModel && isExpanded && (
                         <tr key={`${p.item_id}-models`}>
-                          <td colSpan={11} className="variation-cell">
+                          <td colSpan={13} className="variation-cell">
                             {loadingModels.has(key) ? (
                               <div className="shopee-spinner-sm" />
                             ) : models.length === 0 ? (
@@ -1355,6 +1443,8 @@ export default function ShopeePage() {
                                     <th>Preço</th>
                                     <th>Estoque</th>
                                     <th>Custo</th>
+                                    <th>Frete</th>
+                                    <th>Embalagem</th>
                                     <th>Imposto</th>
                                     <th>Comissão</th>
                                     <th>Lucro</th>
@@ -1366,10 +1456,14 @@ export default function ShopeePage() {
                                     const mKey = `${p.item_id}:${m.model_id}`;
                                     const mPrice = m.price_info?.[0]?.current_price || m.price_info?.[0]?.original_price || 0;
                                     const mDraft = costDrafts[mKey] ?? (costs[mKey] !== undefined ? String(costs[mKey]) : "");
+                                    const mFreightDraft = freightDrafts[mKey] ?? (freightOverrides[mKey] !== undefined ? String(freightOverrides[mKey]) : "");
+                                    const mPackagingDraft = packagingDrafts[mKey] ?? (packagingCosts[mKey] !== undefined ? String(packagingCosts[mKey]) : "");
                                     const mCostValue = costs[mKey];
+                                    const mFreightValue = freightOverrides[mKey] ?? 0;
+                                    const mPackagingValue = packagingCosts[mKey] ?? 0;
                                     const mTax = mPrice * tax;
                                     const mComm = mPrice * 0.20;
-                                    const mProfit = mCostValue !== undefined ? mPrice - mCostValue - mTax - mComm : null;
+                                    const mProfit = mCostValue !== undefined ? mPrice - mCostValue - mTax - mComm - mFreightValue - mPackagingValue : null;
                                     const mMargin = mProfit !== null && mPrice > 0 ? (mProfit / mPrice) * 100 : null;
                                     return (
                                       <tr key={m.model_id}>
@@ -1388,6 +1482,32 @@ export default function ShopeePage() {
                                             onBlur={(e) => { if (e.target.value !== "") handleSaveCost(mKey, e.target.value); }}
                                           />
                                           {savingCostId === mKey && <span className="cost-input__saving">salvando...</span>}
+                                        </td>
+                                        <td>
+                                          <input
+                                            type="number"
+                                            className="cost-input"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="auto"
+                                            value={mFreightDraft}
+                                            onChange={(e) => setFreightDrafts((prev) => ({ ...prev, [mKey]: e.target.value }))}
+                                            onBlur={(e) => { if (e.target.value !== "") handleSaveExtraCost("freight", mKey, e.target.value); }}
+                                          />
+                                          {savingCostId === `freight:${mKey}` && <span className="cost-input__saving">salvando...</span>}
+                                        </td>
+                                        <td>
+                                          <input
+                                            type="number"
+                                            className="cost-input"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="0,00"
+                                            value={mPackagingDraft}
+                                            onChange={(e) => setPackagingDrafts((prev) => ({ ...prev, [mKey]: e.target.value }))}
+                                            onBlur={(e) => { if (e.target.value !== "") handleSaveExtraCost("packaging", mKey, e.target.value); }}
+                                          />
+                                          {savingCostId === `packaging:${mKey}` && <span className="cost-input__saving">salvando...</span>}
                                         </td>
                                         <td className="text-danger">{mPrice ? fmt(mTax) : "—"}</td>
                                         <td className="text-danger">{mPrice ? fmt(mComm) : "—"}</td>
@@ -1410,7 +1530,7 @@ export default function ShopeePage() {
                   );
                 })}
                 {products.length === 0 && (
-                  <tr><td colSpan={11} className="text-center text-muted">Nenhum produto encontrado</td></tr>
+                  <tr><td colSpan={13} className="text-center text-muted">Nenhum produto encontrado</td></tr>
                 )}
               </tbody>
             </table>
