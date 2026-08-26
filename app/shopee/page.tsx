@@ -473,10 +473,15 @@ export default function ShopeePage() {
   const productHasModel: Record<string, boolean> = {};
   products.forEach((p) => { productHasModel[String(p.item_id)] = !!p.has_model; });
 
-  const productSales: Record<string, { itemId: string; baseItemId: string; name: string; qty: number; revenue: number }> = {};
+  const productSales: Record<string, { itemId: string; baseItemId: string; name: string; qty: number; revenue: number; freight: number }> = {};
   const qtyByBaseItem: Record<string, number> = {};
   filteredOrders.forEach((order) => {
-    (order.item_list || []).forEach((item: any) => {
+    // Frete é do pedido, não do item — rateado entre os itens do mesmo
+    // pedido proporcional à quantidade de cada um.
+    const orderShipping = order.actual_shipping_fee || order.estimated_shipping_fee || 0;
+    const orderItems = order.item_list || [];
+    const orderTotalQty = orderItems.reduce((s: number, it: any) => s + (it.model_quantity_purchased || 1), 0);
+    orderItems.forEach((item: any) => {
       // Produtos com variação usam custo por variação (item+model); sem
       // variação, a chave é só o item_id — mesmo esquema usado ao salvar
       // o custo na aba Produtos.
@@ -487,11 +492,13 @@ export default function ShopeePage() {
         ? `${item.item_name || `Produto #${item.item_id}`} — ${item.model_name}`
         : (item.item_name || `Produto #${item.item_id}`);
       if (!productSales[key]) {
-        productSales[key] = { itemId: key, baseItemId, name, qty: 0, revenue: 0 };
+        productSales[key] = { itemId: key, baseItemId, name, qty: 0, revenue: 0, freight: 0 };
       }
       const qty = item.model_quantity_purchased || 1;
+      const lineFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
       productSales[key].qty += qty;
       productSales[key].revenue += (item.model_discounted_price || item.model_original_price || 0) * qty;
+      productSales[key].freight += lineFreight;
       qtyByBaseItem[baseItemId] = (qtyByBaseItem[baseItemId] || 0) + qty;
     });
   });
@@ -524,7 +531,7 @@ export default function ShopeePage() {
   const pieTop = productSalesArr.slice(0, PIE_TOP_N);
   const pieRest = productSalesArr.slice(PIE_TOP_N);
   const pieData = [
-    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, adsCost: p.adsCost, hasCost: p.hasCost })),
+    ...pieTop.map((p) => ({ name: p.name, revenue: p.revenue, qty: p.qty, cost: p.cost, adsCost: p.adsCost, freight: p.freight, hasCost: p.hasCost })),
     ...(pieRest.length > 0
       ? [{
           name: `Outros (${pieRest.length} produtos)`,
@@ -532,6 +539,7 @@ export default function ShopeePage() {
           qty: pieRest.reduce((s, p) => s + p.qty, 0),
           cost: pieRest.reduce((s, p) => s + p.cost, 0),
           adsCost: pieRest.reduce((s, p) => s + p.adsCost, 0),
+          freight: pieRest.reduce((s, p) => s + p.freight, 0),
           hasCost: false,
         }]
       : []),
@@ -539,8 +547,11 @@ export default function ShopeePage() {
 
   // Cada venda individual (uma linha por item vendido, não agrupado por produto)
   const saleLines = filteredOrders
-    .flatMap((order) =>
-      (order.item_list || []).map((item: any) => {
+    .flatMap((order) => {
+      const orderShipping = order.actual_shipping_fee || order.estimated_shipping_fee || 0;
+      const orderItems = order.item_list || [];
+      const orderTotalQty = orderItems.reduce((s: number, it: any) => s + (it.model_quantity_purchased || 1), 0);
+      return orderItems.map((item: any) => {
         const qty = item.model_quantity_purchased || 1;
         const unitPrice = item.model_discounted_price || item.model_original_price || 0;
         const subtotal = unitPrice * qty;
@@ -557,7 +568,8 @@ export default function ShopeePage() {
         const itemAdsTotal = adsExpenseByProduct[baseItemId] || 0;
         const itemQtyTotal = qtyByBaseItem[baseItemId] || 0;
         const lineAds = itemQtyTotal > 0 ? itemAdsTotal * (qty / itemQtyTotal) : 0;
-        const profit = subtotal - cost - lineTax - lineComm - lineAds;
+        const lineFreight = orderTotalQty > 0 ? (qty / orderTotalQty) * orderShipping : 0;
+        const profit = subtotal - cost - lineTax - lineComm - lineAds - lineFreight;
         const margin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
         return {
           orderSn: order.order_sn,
@@ -571,11 +583,12 @@ export default function ShopeePage() {
           tax: lineTax,
           commission: lineComm,
           ads: lineAds,
+          freight: lineFreight,
           profit,
           margin,
         };
-      })
-    )
+      });
+    })
     .sort((a, b) => b.date - a.date);
 
   // Agrupar vendas por dia
@@ -685,7 +698,7 @@ export default function ShopeePage() {
     const pctOfTotal = totalRevenue > 0 ? (d.revenue / totalRevenue) * 100 : 0;
     const dTax = d.revenue * tax;
     const dComm = d.revenue * 0.20;
-    const dProfit = d.revenue - d.cost - dTax - dComm - (d.adsCost || 0);
+    const dProfit = d.revenue - d.cost - dTax - dComm - (d.adsCost || 0) - (d.freight || 0);
     const dMargin = d.revenue > 0 ? (dProfit / d.revenue) * 100 : 0;
     return (
       <div className="pie-tooltip">
@@ -694,6 +707,7 @@ export default function ShopeePage() {
         <span>{d.qty} unidade{d.qty === 1 ? "" : "s"} vendida{d.qty === 1 ? "" : "s"}</span>
         <span>Custo: {fmt(d.cost)}{!d.hasCost && " (estimado)"}</span>
         <span>Ads (rateado): {fmt(d.adsCost || 0)}</span>
+        <span>Frete (rateado): {fmt(d.freight || 0)}</span>
         <span className={dMargin >= 0 ? "text-success" : "text-danger"}>Margem: {dMargin.toFixed(1)}%</span>
       </div>
     );
@@ -873,6 +887,7 @@ export default function ShopeePage() {
                 <th>Imposto</th>
                 <th>Comissão</th>
                 <th>Ads</th>
+                <th>Frete</th>
                 <th>Lucro</th>
                 <th>Margem</th>
               </tr>
@@ -881,7 +896,7 @@ export default function ShopeePage() {
               {productSalesArr.slice(0, 20).map((p, i) => {
                 const pTax = p.revenue * tax;
                 const pComm = p.revenue * 0.20;
-                const pProfit = p.revenue - p.cost - pTax - pComm - p.adsCost;
+                const pProfit = p.revenue - p.cost - pTax - pComm - p.adsCost - p.freight;
                 const pMargin = p.revenue > 0 ? (pProfit / p.revenue) * 100 : 0;
                 return (
                   <tr key={p.itemId}>
@@ -896,6 +911,7 @@ export default function ShopeePage() {
                     <td className="text-danger">{fmt(pTax)}</td>
                     <td className="text-danger">{fmt(pComm)}</td>
                     <td className="text-danger">{fmt(p.adsCost)}</td>
+                    <td className="text-danger">{fmt(p.freight)}</td>
                     <td className={pProfit >= 0 ? "text-success" : "text-danger"}>{fmt(pProfit)}</td>
                     <td className={pMargin >= 0 ? "text-success" : "text-danger"}>{pMargin.toFixed(1)}%</td>
                   </tr>
@@ -928,6 +944,7 @@ export default function ShopeePage() {
                   <th>Imposto</th>
                   <th>Comissão</th>
                   <th>Ads</th>
+                  <th>Frete</th>
                   <th>Lucro</th>
                   <th>Margem</th>
                 </tr>
@@ -948,6 +965,7 @@ export default function ShopeePage() {
                     <td className="text-danger">{fmt(s.tax)}</td>
                     <td className="text-danger">{fmt(s.commission)}</td>
                     <td className="text-danger">{fmt(s.ads)}</td>
+                    <td className="text-danger">{fmt(s.freight)}</td>
                     <td className={s.profit >= 0 ? "text-success" : "text-danger"}>{fmt(s.profit)}</td>
                     <td className={s.margin >= 0 ? "text-success" : "text-danger"}>{s.margin.toFixed(1)}%</td>
                   </tr>
