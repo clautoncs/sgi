@@ -84,6 +84,30 @@ const DEFAULT_OVERVIEW_SPANS: Record<string, number> = {
 const OVERVIEW_SPANS_STORAGE_KEY = "shopee-overview-spans";
 const CANCELLED_STATUSES = ["CANCELLED", "IN_CANCEL"];
 
+// Tabela de comissão da Shopee BR por faixa de preço, vigente desde
+// mar/2026 (fonte pública, não é a doc oficial da Shopee — confirme no seu
+// extrato se mudou). Comissão = preço*taxa + valor fixo da faixa.
+const SHOPEE_COMMISSION_BRACKETS = [
+  { min: 0, max: 79.99, rate: 0.20, fixed: 4 },
+  { min: 80, max: 99.99, rate: 0.14, fixed: 16 },
+  { min: 100, max: 199.99, rate: 0.14, fixed: 20 },
+  { min: 200, max: Infinity, rate: 0.14, fixed: 26 },
+];
+const SHOPEE_CPF_EXTRA_FEE = 3; // R$3 fixo por item pra vendedor CPF (fonte pública)
+const SHOPEE_BRACKET_BOUNDARIES = [80, 100, 200];
+
+function getShopeeBracket(price: number) {
+  return (
+    SHOPEE_COMMISSION_BRACKETS.find((b) => price >= b.min && price <= b.max) ||
+    SHOPEE_COMMISSION_BRACKETS[SHOPEE_COMMISSION_BRACKETS.length - 1]
+  );
+}
+
+function shopeeCommissionFee(price: number): number {
+  const b = getShopeeBracket(price);
+  return price * b.rate + b.fixed;
+}
+
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -125,6 +149,8 @@ export default function ShopeePage() {
   const [calcManualSaleValue, setCalcManualSaleValue] = useState("");
   const [calcFeaturedCampaigns, setCalcFeaturedCampaigns] = useState(false);
   const [calcAdsPercent, setCalcAdsPercent] = useState("");
+  const [calcAffiliateEnabled, setCalcAffiliateEnabled] = useState(false);
+  const [calcAffiliatePercent, setCalcAffiliatePercent] = useState("1");
 
   // Config form
   const [partnerId, setPartnerId] = useState("");
@@ -684,11 +710,15 @@ export default function ShopeePage() {
     const shopeeAntecipa = (Number(calcShopeeAdvance.replace(",", ".")) || 0) / 100;
     const imposto = (Number(calcSalesTax.replace(",", ".")) || 0) / 100;
     const campanhas = calcFeaturedCampaigns ? 0.025 : 0;
+    const afiliado = calcAffiliateEnabled ? (Number(calcAffiliatePercent.replace(",", ".")) || 0) / 100 : 0;
     const adsPct = (Number(calcAdsPercent.replace(",", ".")) || 0) / 100;
     const margemDesejada = (Number(calcProfitMargin.replace(",", ".")) || 0) / 100;
     const manual = calcManualSaleValue ? Number(calcManualSaleValue.replace(",", ".")) || 0 : 0;
+    const cpfExtra = calcBusinessType === "cpf" ? SHOPEE_CPF_EXTRA_FEE : 0;
 
-    const totalTaxasPct = shopeeAntecipa + imposto + campanhas;
+    // Taxas percentuais que incidem sobre o preço, fora a comissão por
+    // faixa (que tem também um valor fixo, resolvido à parte por faixa).
+    const outrasTaxasPct = shopeeAntecipa + imposto + campanhas + afiliado;
 
     if (custoTotal <= 0) {
       return { valid: false as const, reason: "Informe o custo do produto." };
@@ -701,19 +731,32 @@ export default function ShopeePage() {
       precoVenda = manual;
       modo = "reverso";
     } else {
-      const denominador = 1 - totalTaxasPct - margemDesejada * (1 + adsPct);
-      if (denominador <= 0) {
-        return { valid: false as const, reason: "Essa combinação de taxas + margem não fecha (passa de 100% do preço). Reduza a margem ou as taxas." };
+      // Resolve a equação dentro de cada faixa (comissão tem taxa + fixo
+      // constantes ali dentro) e usa a primeira cujo preço resultante
+      // realmente cai na própria faixa.
+      let encontrado: number | null = null;
+      for (const b of SHOPEE_COMMISSION_BRACKETS) {
+        const denominador = 1 - b.rate - outrasTaxasPct - margemDesejada * (1 + adsPct);
+        if (denominador <= 0) continue;
+        const candidato = (custoTotal + b.fixed + cpfExtra) / denominador;
+        if (candidato >= b.min && candidato <= b.max) {
+          encontrado = candidato;
+          break;
+        }
       }
-      precoVenda = custoTotal / denominador;
+      if (encontrado === null) {
+        return { valid: false as const, reason: "Essa combinação de taxas + margem não fecha em nenhuma faixa de preço da Shopee. Reduza a margem ou as taxas." };
+      }
+      precoVenda = encontrado;
       modo = "direto";
     }
 
-    const taxasValor = totalTaxasPct * precoVenda;
+    const comissaoShopee = shopeeCommissionFee(precoVenda);
+    const outrasTaxasValor = outrasTaxasPct * precoVenda;
+    const taxasValor = comissaoShopee + outrasTaxasValor + cpfExtra;
     let lucroBruto: number;
     if (modo === "reverso") {
-      const denomReverso = 1 + adsPct;
-      lucroBruto = (precoVenda * (1 - totalTaxasPct) - custoTotal) / denomReverso;
+      lucroBruto = (precoVenda - custoTotal - comissaoShopee - outrasTaxasValor - cpfExtra) / (1 + adsPct);
     } else {
       lucroBruto = margemDesejada * precoVenda;
     }
@@ -722,11 +765,36 @@ export default function ShopeePage() {
     const margemBruta = precoVenda > 0 ? (lucroBruto / precoVenda) * 100 : 0;
     const margemLiquida = precoVenda > 0 ? (lucroLiquido / precoVenda) * 100 : 0;
 
+    // Alerta de proximidade da faixa: mostra quanto custaria ficar do outro
+    // lado do limite mais próximo (pra cima ou pra baixo).
+    const bracketAtual = getShopeeBracket(precoVenda);
+    let alertaFaixa: string | null = null;
+    for (const limite of SHOPEE_BRACKET_BOUNDARIES) {
+      const distancia = Math.abs(precoVenda - limite);
+      if (distancia <= 20) {
+        const precoAbaixo = limite - 0.01;
+        const precoAcima = limite;
+        const comissaoAbaixo = shopeeCommissionFee(precoAbaixo);
+        const comissaoAcima = shopeeCommissionFee(precoAcima);
+        const diferenca = comissaoAcima - comissaoAbaixo;
+        if (precoVenda >= limite) {
+          alertaFaixa = `Seu preço (${precoVenda.toFixed(2)}) está a ${distancia.toFixed(2)} de cair pra faixa anterior (abaixo de ${limite.toFixed(2)}). Ali a comissão seria ${fmt(comissaoAbaixo)} em vez de ${fmt(comissaoAcima)} — ${diferenca > 0 ? `${fmt(diferenca)} a menos de taxa` : "sem diferença relevante"} se ajustar o preço pra baixo dessa linha.`;
+        } else {
+          alertaFaixa = `Cuidado: seu preço (${precoVenda.toFixed(2)}) está a só ${distancia.toFixed(2)} de cruzar pra próxima faixa (${limite.toFixed(2)}+). Cruzando, a comissão pula de ${fmt(comissaoAbaixo)} para ${fmt(comissaoAcima)} (${fmt(diferenca)} a mais), mesmo vendendo por quase o mesmo preço.`;
+        }
+        break;
+      }
+    }
+
     return {
       valid: true as const,
       modo,
       custoTotal,
       precoVenda,
+      comissaoShopee,
+      cpfExtra,
+      bracketAtual,
+      alertaFaixa,
       taxasValor,
       lucroBruto,
       adsValor,
@@ -1647,35 +1715,72 @@ export default function ShopeePage() {
                 <label>% investida do lucro em ads (ROAS ativo)</label>
                 <input type="text" inputMode="decimal" placeholder="0" value={calcAdsPercent} onChange={(e) => setCalcAdsPercent(e.target.value)} />
               </div>
+              <div className="form-group calc-checkbox">
+                <label>
+                  <input type="checkbox" checked={calcAffiliateEnabled} onChange={(e) => setCalcAffiliateEnabled(e.target.checked)} />
+                  Comissão de Afiliado
+                </label>
+              </div>
+              <div className="form-group">
+                <label>Comissão de Afiliado (%)</label>
+                <input type="text" inputMode="decimal" placeholder="1" value={calcAffiliatePercent} onChange={(e) => setCalcAffiliatePercent(e.target.value)} disabled={!calcAffiliateEnabled} />
+              </div>
             </div>
+
+            <p className="text-muted" style={{ marginTop: 12, fontSize: 13 }}>
+              💡 A comissão da Shopee usada aqui segue a tabela por faixa de preço (não é mais um % fixo): até R$79,99 → 20%+R$4; R$80–99,99 → 14%+R$16; R$100–199,99 → 14%+R$20; a partir de R$200 → 14%+R$26.
+              {calcBusinessType === "cpf" && " Vendedor pessoa física (CPF) tem uma taxa fixa adicional de R$3 por item."}
+              {" "}Desconto no Pix pro comprador é bancado pela própria Shopee, não sai do seu repasse — por isso não entra como custo aqui.
+              {" "}Valores de fonte pública (não é a documentação oficial da Shopee) — confira no seu extrato de repasse se bate.
+            </p>
 
             {!calc.valid ? (
               <p className="cost-warning" style={{ marginTop: 20 }}>{calc.reason}</p>
             ) : (
-              <div className="calc-results">
-                <div className="ov-card ov-card--revenue">
-                  <span className="ov-card__label">{calc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
-                  <span className="ov-card__value">{fmt(calc.precoVenda)}</span>
+              <>
+                {calc.alertaFaixa && (
+                  <p className="cost-warning" style={{ marginTop: 20, background: "#fff8e1", borderColor: "#f0c419" }}>
+                    ⚠️ {calc.alertaFaixa}
+                  </p>
+                )}
+                <div className="calc-results">
+                  <div className="ov-card ov-card--revenue">
+                    <span className="ov-card__label">{calc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
+                    <span className="ov-card__value">{fmt(calc.precoVenda)}</span>
+                    <span className="ov-card__sub">
+                      Faixa: {calc.bracketAtual.max === Infinity ? `a partir de ${fmt(calc.bracketAtual.min)}` : `${fmt(calc.bracketAtual.min)} – ${fmt(calc.bracketAtual.max)}`} ({(calc.bracketAtual.rate * 100).toFixed(0)}% + {fmt(calc.bracketAtual.fixed)})
+                    </span>
+                  </div>
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Comissão Shopee (faixa)</span>
+                    <span className="ov-card__value">{fmt(calc.comissaoShopee)}</span>
+                  </div>
+                  {calc.cpfExtra > 0 && (
+                    <div className="ov-card ov-card--tax">
+                      <span className="ov-card__label">Taxa fixa CPF</span>
+                      <span className="ov-card__value">{fmt(calc.cpfExtra)}</span>
+                    </div>
+                  )}
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Taxas totais (Shopee + CPF + Imposto + Campanhas + Afiliado)</span>
+                    <span className="ov-card__value">{fmt(calc.taxasValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--commission">
+                    <span className="ov-card__label">Investimento em Ads</span>
+                    <span className="ov-card__value">{fmt(calc.adsValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--profit">
+                    <span className="ov-card__label">Lucro Bruto</span>
+                    <span className="ov-card__value">{fmt(calc.lucroBruto)}</span>
+                    <span className="ov-card__sub">Margem bruta: {calc.margemBruta.toFixed(1)}%</span>
+                  </div>
+                  <div className={`ov-card ${calc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
+                    <span className="ov-card__label">Lucro Líquido (após ads)</span>
+                    <span className="ov-card__value">{fmt(calc.lucroLiquido)}</span>
+                    <span className="ov-card__sub">Margem líquida: {calc.margemLiquida.toFixed(1)}%</span>
+                  </div>
                 </div>
-                <div className="ov-card ov-card--tax">
-                  <span className="ov-card__label">Taxas (Shopee + Imposto + Campanhas)</span>
-                  <span className="ov-card__value">{fmt(calc.taxasValor)}</span>
-                </div>
-                <div className="ov-card ov-card--commission">
-                  <span className="ov-card__label">Investimento em Ads</span>
-                  <span className="ov-card__value">{fmt(calc.adsValor)}</span>
-                </div>
-                <div className="ov-card ov-card--profit">
-                  <span className="ov-card__label">Lucro Bruto</span>
-                  <span className="ov-card__value">{fmt(calc.lucroBruto)}</span>
-                  <span className="ov-card__sub">Margem bruta: {calc.margemBruta.toFixed(1)}%</span>
-                </div>
-                <div className={`ov-card ${calc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
-                  <span className="ov-card__label">Lucro Líquido (após ads)</span>
-                  <span className="ov-card__value">{fmt(calc.lucroLiquido)}</span>
-                  <span className="ov-card__sub">Margem líquida: {calc.margemLiquida.toFixed(1)}%</span>
-                </div>
-              </div>
+              </>
             )}
           </div>
         </div>
