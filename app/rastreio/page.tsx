@@ -4,44 +4,50 @@ import "./rastreio.css";
 
 interface TrackingOrder {
   id: string;
+  orderDate: string | null;
+  buyerPerson: string;
+  accountName: string | null;
+  sellerName: string | null;
+  externalOrderId: string | null;
+  productName: string;
+  quantity: number | null;
+  unitValue: number | null;
+  paymentMethod: string | null;
+  shippingAddress: string | null;
   trackingCode: string;
-  supplier: string;
-  productName: string | null;
-  amountPaid: number | null;
-  expectedDate: string | null;
   notes: string | null;
-  status: string | null;
+  statusCategory: string | null;
+  statusRaw: string | null;
   lastCheckedAt: string | null;
   archived: boolean;
   createdAt: string;
   createdBy: { name: string } | null;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  aguardando_consulta: "Aguardando consulta",
-  indisponivel: "Status indisponível",
-  entregue: "Entregue",
-  em_transito: "Em trânsito",
-  em_transporte: "Em transporte",
-  desconhecido: "Desconhecido",
-  postado: "Postado",
-};
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "postado", label: "Postado" },
+  { value: "em_transito", label: "Em Trânsito" },
+  { value: "barrado", label: "Barrado / Proibido / Devolvido" },
+  { value: "entregue", label: "Entregue" },
+];
 
 function statusLabel(status: string | null): string {
-  if (!status) return "—";
-  return STATUS_LABELS[status] || status;
-}
-
-function statusClass(status: string | null): string {
-  return `status-${status || "desconhecido"}`;
+  if (!status) return "Sem status";
+  return STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
 }
 
 const emptyForm = {
-  trackingCode: "",
-  supplier: "AliExpress",
+  orderDate: "",
+  buyerPerson: "",
+  accountName: "",
+  sellerName: "",
+  externalOrderId: "",
   productName: "",
-  amountPaid: "",
-  expectedDate: "",
+  quantity: "",
+  unitValue: "",
+  paymentMethod: "",
+  shippingAddress: "",
+  trackingCode: "",
   notes: "",
 };
 
@@ -50,6 +56,10 @@ export default function RastreioPage() {
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkResult, setBulkResult] = useState<{ created: number; errors: any[] } | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -85,11 +95,17 @@ export default function RastreioPage() {
   function openEditar(o: TrackingOrder) {
     setEditingId(o.id);
     setForm({
+      orderDate: o.orderDate ? o.orderDate.slice(0, 10) : "",
+      buyerPerson: o.buyerPerson,
+      accountName: o.accountName || "",
+      sellerName: o.sellerName || "",
+      externalOrderId: o.externalOrderId || "",
+      productName: o.productName,
+      quantity: o.quantity != null ? String(o.quantity) : "",
+      unitValue: o.unitValue != null ? String(o.unitValue) : "",
+      paymentMethod: o.paymentMethod || "",
+      shippingAddress: o.shippingAddress || "",
       trackingCode: o.trackingCode,
-      supplier: o.supplier,
-      productName: o.productName || "",
-      amountPaid: o.amountPaid != null ? String(o.amountPaid) : "",
-      expectedDate: o.expectedDate ? o.expectedDate.slice(0, 10) : "",
       notes: o.notes || "",
     });
     setError("");
@@ -97,19 +113,25 @@ export default function RastreioPage() {
   }
 
   async function salvar() {
-    if (!form.trackingCode.trim() || !form.supplier.trim()) {
-      setError("Código de rastreio e fornecedor são obrigatórios.");
+    if (!form.trackingCode.trim() || !form.buyerPerson.trim()) {
+      setError("Código de rastreio e pessoa são obrigatórios.");
       return;
     }
     setSaving(true);
     setError("");
     try {
       const payload = {
+        orderDate: form.orderDate || null,
+        buyerPerson: form.buyerPerson,
+        accountName: form.accountName || null,
+        sellerName: form.sellerName || null,
+        externalOrderId: form.externalOrderId || null,
+        productName: form.productName || "—",
+        quantity: form.quantity || null,
+        unitValue: form.unitValue ? form.unitValue.replace(",", ".") : null,
+        paymentMethod: form.paymentMethod || null,
+        shippingAddress: form.shippingAddress || null,
         trackingCode: form.trackingCode,
-        supplier: form.supplier,
-        productName: form.productName || null,
-        amountPaid: form.amountPaid ? Number(form.amountPaid.replace(",", ".")) : null,
-        expectedDate: form.expectedDate || null,
         notes: form.notes || null,
       };
       const res = await fetch("/api/rastreio", {
@@ -129,6 +151,24 @@ export default function RastreioPage() {
     }
   }
 
+  async function importarEmMassa() {
+    if (!bulkText.trim()) return;
+    setBulkSaving(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch("/api/rastreio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk_import", text: bulkText }),
+      });
+      const data = await res.json();
+      setBulkResult(data);
+      if (data.created > 0) fetchOrders();
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function refreshStatus(id: string) {
     setRefreshingId(id);
     try {
@@ -141,6 +181,15 @@ export default function RastreioPage() {
     } finally {
       setRefreshingId(null);
     }
+  }
+
+  async function setStatus(id: string, statusCategory: string) {
+    const res = await fetch("/api/rastreio", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "set_status", statusCategory }),
+    });
+    if (res.ok) fetchOrders();
   }
 
   async function arquivar(id: string, archived: boolean) {
@@ -165,14 +214,19 @@ export default function RastreioPage() {
 
   function formatDate(iso: string | null): string {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("pt-BR");
+    return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
   }
 
   return (
     <div className="rastreio-container">
       <div className="rastreio-header">
         <h1>Rastreio de Pedidos</h1>
-        <button className="rastreio-btn-novo" onClick={openNovo}>+ Novo Rastreio</button>
+        <div className="rastreio-header-btns">
+          <button className="rastreio-btn-secundario" onClick={() => { setBulkText(""); setBulkResult(null); setBulkOpen(true); }}>
+            📋 Colar da Planilha
+          </button>
+          <button className="rastreio-btn-novo" onClick={openNovo}>+ Novo Rastreio</button>
+        </div>
       </div>
 
       <div className="rastreio-filtros">
@@ -189,34 +243,67 @@ export default function RastreioPage() {
       ) : orders.length === 0 ? (
         <div className="rastreio-vazio">Nenhum pedido cadastrado ainda.</div>
       ) : (
-        <div className="rastreio-lista">
-          {orders.map((o) => (
-            <div key={o.id} className="rastreio-card">
-              <div className="rastreio-card-main">
-                <span className="rastreio-card-codigo">{o.trackingCode}</span>
-                <div className="rastreio-card-info">
-                  <span>📦 {o.supplier}</span>
-                  {o.productName && <span>🛒 {o.productName}</span>}
-                  {o.amountPaid != null && <span>💰 {formatCurrency(o.amountPaid)}</span>}
-                  {o.expectedDate && <span>📅 Previsão: {formatDate(o.expectedDate)}</span>}
-                  {o.lastCheckedAt && <span>🕐 Consultado em {formatDate(o.lastCheckedAt)}</span>}
-                  {o.createdBy?.name && <span>Cadastrado por: {o.createdBy.name}</span>}
-                </div>
-                {o.notes && <span className="rastreio-card-notas">{o.notes}</span>}
-              </div>
-              <div className="rastreio-card-acoes">
-                <span className={`rastreio-status-badge ${statusClass(o.status)}`}>{statusLabel(o.status)}</span>
-                <div className="rastreio-card-btns">
-                  <button onClick={() => refreshStatus(o.id)} disabled={refreshingId === o.id}>
-                    {refreshingId === o.id ? "Consultando..." : "🔄 Atualizar"}
-                  </button>
-                  <button onClick={() => openEditar(o)}>✏️ Editar</button>
-                  <button onClick={() => arquivar(o.id, o.archived)}>{o.archived ? "Reativar" : "Arquivar"}</button>
-                  <button onClick={() => excluir(o.id)}>🗑</button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="rastreio-tabela-wrap">
+          <table className="rastreio-tabela">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Pessoa</th>
+                <th>Conta</th>
+                <th>Vendedor</th>
+                <th>Pedido</th>
+                <th>Compra</th>
+                <th>Quan.</th>
+                <th>Valor</th>
+                <th>Pagam.</th>
+                <th>Endereço</th>
+                <th>Rastreamento</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id}>
+                  <td>{formatDate(o.orderDate)}</td>
+                  <td>{o.buyerPerson}</td>
+                  <td>{o.accountName || "—"}</td>
+                  <td>{o.sellerName || "—"}</td>
+                  <td className="mono">{o.externalOrderId || "—"}</td>
+                  <td>{o.productName}</td>
+                  <td>{o.quantity ?? "—"}</td>
+                  <td>{formatCurrency(o.unitValue)}</td>
+                  <td>{o.paymentMethod || "—"}</td>
+                  <td>{o.shippingAddress || "—"}</td>
+                  <td className="mono">{o.trackingCode}</td>
+                  <td>
+                    <select
+                      className={`rastreio-status-select status-${o.statusCategory || "sem_status"}`}
+                      value={o.statusCategory || ""}
+                      onChange={(e) => setStatus(o.id, e.target.value)}
+                    >
+                      <option value="">Sem status</option>
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <div className="rastreio-tabela-acoes">
+                      <button onClick={() => refreshStatus(o.id)} disabled={refreshingId === o.id} title="Atualizar via API">
+                        {refreshingId === o.id ? "..." : "🔄"}
+                      </button>
+                      <button onClick={() => openEditar(o)} title="Editar">✏️</button>
+                      <button onClick={() => arquivar(o.id, o.archived)} title={o.archived ? "Reativar" : "Arquivar"}>
+                        {o.archived ? "↩️" : "📥"}
+                      </button>
+                      <button onClick={() => excluir(o.id)} title="Excluir">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -225,57 +312,55 @@ export default function RastreioPage() {
           <div className="rastreio-modal" onClick={(e) => e.stopPropagation()}>
             <h3>{editingId ? "Editar Rastreio" : "Novo Rastreio"}</h3>
 
-            <div className="rastreio-form-group">
-              <label>Código de Rastreio</label>
-              <input
-                type="text"
-                placeholder="NN349720023BR"
-                value={form.trackingCode}
-                onChange={(e) => setForm({ ...form, trackingCode: e.target.value })}
-              />
-            </div>
-            <div className="rastreio-form-group">
-              <label>Fornecedor</label>
-              <input
-                type="text"
-                placeholder="AliExpress"
-                value={form.supplier}
-                onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-              />
-            </div>
-            <div className="rastreio-form-group">
-              <label>Produto vinculado</label>
-              <input
-                type="text"
-                value={form.productName}
-                onChange={(e) => setForm({ ...form, productName: e.target.value })}
-              />
-            </div>
-            <div className="rastreio-form-group">
-              <label>Valor Pago (R$)</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={form.amountPaid}
-                onChange={(e) => setForm({ ...form, amountPaid: e.target.value })}
-              />
-            </div>
-            <div className="rastreio-form-group">
-              <label>Previsão de Entrega</label>
-              <input
-                type="date"
-                value={form.expectedDate}
-                onChange={(e) => setForm({ ...form, expectedDate: e.target.value })}
-              />
-            </div>
-            <div className="rastreio-form-group">
-              <label>Notas</label>
-              <textarea
-                rows={3}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
+            <div className="rastreio-form-grid">
+              <div className="rastreio-form-group">
+                <label>Data</label>
+                <input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Pessoa</label>
+                <input type="text" value={form.buyerPerson} onChange={(e) => setForm({ ...form, buyerPerson: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Conta</label>
+                <input type="text" value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Vendedor</label>
+                <input type="text" value={form.sellerName} onChange={(e) => setForm({ ...form, sellerName: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Pedido (nº)</label>
+                <input type="text" value={form.externalOrderId} onChange={(e) => setForm({ ...form, externalOrderId: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group rastreio-form-group--wide">
+                <label>Compra</label>
+                <input type="text" value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Quantidade</label>
+                <input type="text" inputMode="numeric" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Valor (unitário)</label>
+                <input type="text" inputMode="decimal" placeholder="0,00" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Pagamento</label>
+                <input type="text" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Endereço</label>
+                <input type="text" value={form.shippingAddress} onChange={(e) => setForm({ ...form, shippingAddress: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group rastreio-form-group--wide">
+                <label>Código de Rastreio</label>
+                <input type="text" placeholder="NN349720023BR" value={form.trackingCode} onChange={(e) => setForm({ ...form, trackingCode: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group rastreio-form-group--wide">
+                <label>Notas</label>
+                <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </div>
             </div>
 
             {error && <p className="rastreio-error">{error}</p>}
@@ -285,6 +370,45 @@ export default function RastreioPage() {
                 {saving ? "Salvando..." : "Salvar"}
               </button>
               <button className="rastreio-btn-cancelar" onClick={() => setModalOpen(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkOpen && (
+        <div className="rastreio-modal-overlay" onClick={() => setBulkOpen(false)}>
+          <div className="rastreio-modal rastreio-modal--wide" onClick={(e) => e.stopPropagation()}>
+            <h3>Colar da Planilha</h3>
+            <p className="rastreio-hint">
+              Selecione as linhas na sua planilha (sem o cabeçalho) na ordem Data, Pessoa, Conta, Vendedor, Pedido, Compra, Quan., Valor, Pagam., Endereço, Rastreamento — copie (Ctrl+C) e cole abaixo.
+            </p>
+            <textarea
+              className="rastreio-bulk-textarea"
+              rows={10}
+              placeholder="Cole aqui as linhas copiadas da planilha..."
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+            />
+            {bulkResult && (
+              <div className="rastreio-bulk-resultado">
+                <p>✅ {bulkResult.created} registro(s) importado(s).</p>
+                {bulkResult.errors.length > 0 && (
+                  <>
+                    <p>⚠️ {bulkResult.errors.length} linha(s) com problema:</p>
+                    <ul>
+                      {bulkResult.errors.map((e, i) => (
+                        <li key={i}>{e.reason} — <span className="mono">{e.line.slice(0, 60)}</span></li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="rastreio-modal-acoes">
+              <button className="rastreio-btn-salvar" onClick={importarEmMassa} disabled={bulkSaving}>
+                {bulkSaving ? "Importando..." : "Importar"}
+              </button>
+              <button className="rastreio-btn-cancelar" onClick={() => setBulkOpen(false)}>Fechar</button>
             </div>
           </div>
         </div>

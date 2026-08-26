@@ -175,22 +175,32 @@ model SystemSetting {
 // ============================================================
 
 model TrackingOrder {
-  id             String    @id @default(cuid())
-  trackingCode   String             // ex: NN349720023BR
-  supplier       String             // fornecedor: AliExpress, Shein, etc.
-  productName    String?            // produto vinculado
-  amountPaid     Float?             // valor pago
-  expectedDate   DateTime?          // previsão de entrega
-  notes          String?  @db.Text
-  status         String?            // último status conhecido (cache)
-  statusDetails  String?  @db.Text  // JSON com histórico de eventos retornado pela API
-  lastCheckedAt  DateTime?
-  archived       Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String    @id @default(cuid())
+  orderDate        DateTime?          // DATA
+  buyerPerson      String             // PESSOA
+  accountName      String?            // CONTA
+  sellerName       String?            // VENDEDOR
+  externalOrderId  String?            // PEDIDO (nº do pedido no marketplace)
+  productName      String             // COMPRA
+  quantity         Int?               // QUAN.
+  unitValue        Float?             // VALOR (preço unitário pago)
+  paymentMethod    String?            // PAGAM (cartão/conta usada)
+  shippingAddress  String?            // ENDEREÇO (endereço de entrega interno)
+  trackingCode     String             // RASTREAMENTO, ex: NN349720023BR
+  notes            String?  @db.Text
 
-  createdBy      User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdById    String?
+  // postado (azul) | em_transito (amarelo) | barrado (vermelho) | entregue (verde)
+  statusCategory   String?
+  statusRaw        String?            // texto bruto retornado pela API/carrier
+  statusDetails    String?  @db.Text  // JSON com histórico de eventos retornado pela API
+  lastCheckedAt    DateTime?
+
+  archived         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdBy        User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById      String?
 
   @@map("tracking_orders")
 }
