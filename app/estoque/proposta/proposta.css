@@ -2,7 +2,7 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 40px;
-  background: #fff;
+  background: var(--surface);
   color: #1a1a1a;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-height: 100vh;
@@ -26,7 +26,7 @@
 
 .proposta-logo p {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--muted);
   margin: 4px 0 0;
 }
 
@@ -36,7 +36,7 @@
 
 .proposta-empresa-info p {
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--muted);
   margin: 2px 0;
 }
 
@@ -60,9 +60,9 @@
 
 .proposta-meta span {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--muted);
   padding: 4px 12px;
-  background: #f1f5f9;
+  background: var(--bg);
   border-radius: 4px;
 }
 
@@ -93,16 +93,16 @@
 }
 
 .proposta-tabela td small {
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.72rem;
 }
 
 .proposta-tabela tbody tr:hover {
-  background: #f8fafc;
+  background: var(--bg);
 }
 
 .proposta-tabela tfoot td {
-  background: #f1f5f9;
+  background: var(--bg);
   font-size: 0.9rem;
   border-top: 2px solid #1e40af;
 }
@@ -113,7 +113,7 @@
 }
 
 .proposta-condicoes {
-  background: #f8fafc;
+  background: var(--bg);
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 16px 20px;
@@ -134,7 +134,7 @@
 
 .proposta-condicoes li {
   font-size: 0.78rem;
-  color: #475569;
+  color: var(--muted);
   padding: 4px 0;
   padding-left: 16px;
   position: relative;
@@ -155,7 +155,7 @@
 
 .proposta-footer p {
   font-size: 0.72rem;
-  color: #94a3b8;
+  color: var(--muted);
   margin: 2px 0;
 }
 
@@ -182,8 +182,8 @@
 }
 
 .proposta-acoes button:last-child {
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--line);
+  color: var(--muted);
 }
 
 .proposta-erro {
@@ -196,7 +196,7 @@
 .proposta-loading {
   padding: 60px;
   text-align: center;
-  color: #64748b;
+  color: var(--muted);
 }
 
 /* Print styles */
@@ -212,6 +212,6 @@
   }
   
   body {
-    background: #fff !important;
+    background: var(--surface) !important;
   }
 }

@@ -7,16 +7,60 @@
   --muted: #7d8590;
   --accent: #4d9fff;
   --ok: #3fb950;
+  --input-bg: #0d1420;
+  --input-text: #e6edf3;
+  --input-border: #2a3a50;
+  --input-placeholder: #7d8590;
   --mono: ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas",
     "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
+  color-scheme: dark;
+}
+
+/* Tema claro — ativado pelo botão sol/lua no topo (persistido em localStorage) */
+[data-theme="light"] {
+  --bg: #f3f5f9;
+  --bg-glow: #e9eef6;
+  --surface: #ffffff;
+  --line: #d9e0e9;
+  --text: #1a2330;
+  --muted: #5b6472;
+  --accent: #2f7fe0;
+  --ok: #1a7f37;
+  --input-bg: #ffffff;
+  --input-text: #1a2330;
+  --input-border: #c3ccd8;
+  --input-placeholder: #8a93a1;
+  color-scheme: light;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Campos de texto legíveis nos dois temas — os CSS de página têm cores
+   fixas conflitantes (uns claros, uns escuros), então os tokens entram
+   com !important pra garantir contraste em qualquer tela. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder) !important;
+  opacity: 1;
+}
+
+select option {
+  background-color: var(--input-bg);
+  color: var(--input-text);
 }
 
 html,

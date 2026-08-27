@@ -2,7 +2,7 @@
   padding: 24px;
   max-width: 1100px;
   margin: 0 auto;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 .pedido-header {
@@ -22,7 +22,7 @@
 
 .pedido-header-left h1 {
   font-size: 1.5rem;
-  color: #f1f5f9;
+  color: var(--text);
   margin: 0;
 }
 
@@ -35,7 +35,7 @@
 
 .pedido-data {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--muted);
 }
 
 .status-badge {
@@ -46,7 +46,7 @@
   text-transform: uppercase;
 }
 
-.status-rascunho { background: #334155; color: #94a3b8; }
+.status-rascunho { background: var(--line); color: var(--muted); }
 .status-pendente { background: #92400e33; color: #fbbf24; border: 1px solid #92400e; }
 .status-aprovado { background: #16653433; color: #4ade80; border: 1px solid #166534; }
 .status-rejeitado { background: #7f1d1d33; color: #f87171; border: 1px solid #7f1d1d; }
@@ -56,11 +56,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
-  background: #1e293b;
+  background: var(--surface);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  border: 1px solid #334155;
+  border: 1px solid var(--line);
 }
 
 .pedido-campo {
@@ -71,22 +71,22 @@
 
 .pedido-campo label {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--muted);
   text-transform: uppercase;
   font-weight: 600;
 }
 
 .pedido-campo span {
   font-size: 0.9rem;
-  color: #e2e8f0;
+  color: var(--text);
 }
 
 .pedido-campo input {
-  background: #0f172a;
-  border: 1px solid #475569;
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 10px;
-  color: #e2e8f0;
+  color: var(--text);
   font-size: 0.85rem;
 }
 
@@ -100,16 +100,16 @@
 }
 
 .pedido-obs {
-  background: #1e293b;
+  background: var(--surface);
   border-radius: 12px;
   padding: 16px 20px;
   margin-bottom: 20px;
-  border: 1px solid #334155;
+  border: 1px solid var(--line);
 }
 
 .pedido-obs label {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--muted);
   text-transform: uppercase;
   font-weight: 600;
   display: block;
@@ -117,18 +117,18 @@
 }
 
 .pedido-obs p {
-  color: #cbd5e1;
+  color: var(--muted);
   font-size: 0.85rem;
   margin: 0;
 }
 
 .pedido-obs textarea {
   width: 100%;
-  background: #0f172a;
-  border: 1px solid #475569;
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #e2e8f0;
+  color: var(--text);
   font-size: 0.85rem;
   resize: vertical;
 }
@@ -139,22 +139,22 @@
 
 .pedido-itens h2 {
   font-size: 1rem;
-  color: #f1f5f9;
+  color: var(--text);
   margin: 0 0 12px;
 }
 
 .pedido-tabela {
   width: 100%;
   border-collapse: collapse;
-  background: #1e293b;
+  background: var(--surface);
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #334155;
+  border: 1px solid var(--line);
 }
 
 .pedido-tabela th {
-  background: #0f172a;
-  color: #94a3b8;
+  background: var(--bg);
+  color: var(--muted);
   padding: 10px 12px;
   font-size: 0.72rem;
   text-align: left;
@@ -165,20 +165,20 @@
 .pedido-tabela td {
   padding: 10px 12px;
   font-size: 0.8rem;
-  border-bottom: 1px solid #334155;
-  color: #cbd5e1;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .pedido-tabela td strong {
-  color: #f1f5f9;
+  color: var(--text);
 }
 
 .pedido-tabela td small {
-  color: #64748b;
+  color: var(--muted);
 }
 
 .pedido-tabela tfoot td {
-  background: #0f172a;
+  background: var(--bg);
   border-top: 2px solid #1e40af;
 }
 
@@ -201,11 +201,11 @@
 
 .input-qtd, .input-desc, .input-valor {
   width: 70px;
-  background: #0f172a;
-  border: 1px solid #475569;
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px 6px;
-  color: #e2e8f0;
+  color: var(--text);
   font-size: 0.8rem;
   text-align: center;
 }
@@ -254,13 +254,13 @@
   text-decoration: none;
 }
 
-.btn-editar { background: #334155; color: #e2e8f0; }
+.btn-editar { background: var(--line); color: var(--text); }
 .btn-editar:hover { background: #475569; }
 .btn-enviar { background: #92400e; color: #fbbf24; }
 .btn-enviar:hover { background: #a16207; }
 .btn-salvar { background: #166534; color: #4ade80; }
 .btn-salvar:hover { background: #15803d; }
-.btn-cancelar { background: #334155; color: #94a3b8; }
+.btn-cancelar { background: var(--line); color: var(--muted); }
 .btn-whatsapp-pedido { background: #166534; color: #4ade80; }
 .btn-copiar { background: #1e3a5f; color: #60a5fa; }
 .btn-copiar:hover { background: #1e40af; }
@@ -270,6 +270,6 @@
   justify-content: center;
   align-items: center;
   min-height: 300px;
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 1rem;
 }
