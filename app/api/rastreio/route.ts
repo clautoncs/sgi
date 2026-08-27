@@ -15,41 +15,47 @@ const STATUS_CATEGORIES = ["postado", "em_transito", "barrado", "entregue"];
 
 // Classifica o texto de status retornado pela API (ou digitado manualmente)
 // num dos 4 grupos coloridos pedidos: postado (azul), em_transito (amarelo),
-// barrado (vermelho - alfândega/proibido/devolvido), entregue (verde).
+// barrado (vermelho - alfândega/proibido/devolvido/taxado), entregue (verde).
 function classifyStatus(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const t = raw.toLowerCase();
   if (/entreg/.test(t)) return "entregue";
-  if (/alf[aâ]ndeg|proibid|devolvid|extravi|apreendid|taxa[cç][aã]o/.test(t)) return "barrado";
-  if (/tr[aâ]nsit|encaminhad|saiu para entrega|chegou no país|em rota/.test(t)) return "em_transito";
-  if (/postad|coletado|objeto postado|aceito pelos correios|admitido/.test(t)) return "postado";
+  if (/alf[aâ]ndeg|proibid|devolvid|devolu[cç]|extravi|apreendid|taxa[cç][aã]o|tributad|aguardando pagamento|recusad|barrad/.test(t)) return "barrado";
+  if (/tr[aâ]nsit|encaminhad|saiu para entrega|chegou|em rota|exporta[cç][aã]o|fiscaliza[cç][aã]o|liberad|distribui/.test(t)) return "em_transito";
+  if (/postad|coletado|aceito|admitid|recebido pel/.test(t)) return "postado";
   return null;
 }
 
-// Consulta o status de um código de rastreio na API da Site Rastreio.
-// Endpoint/formato ainda não confirmados com a chave real — se a chamada
-// falhar (config ausente, 4xx/5xx, formato inesperado), devolve status
-// "indisponivel" em vez de derrubar a requisição.
+// Consulta o status na API pública da Seu Rastreio
+// (GET https://seurastreio.com.br/api/public/rastreio/{codigo}).
+// Limite: 10 req/min por IP; respostas boas ficam 10 min em cache lá.
 async function fetchTrackingStatus(code: string): Promise<{ raw: string; category: string | null; details: any } | null> {
-  const apiKey = process.env.SITE_RASTREIO_API_KEY;
+  const apiKey = process.env.SEU_RASTREIO_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const res = await fetch("https://api.siterastreio.com.br/v1/rastreio", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ codigo: code }),
-      signal: AbortSignal.timeout(10000),
+    const res = await fetch(`https://seurastreio.com.br/api/public/rastreio/${encodeURIComponent(code)}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
     });
+    if (res.status === 429) {
+      return { raw: "limite_atingido", category: null, details: { error: "HTTP 429 - limite de consultas atingido" } };
+    }
     if (!res.ok) {
       return { raw: "indisponivel", category: null, details: { error: `HTTP ${res.status}` } };
     }
     const data = await res.json();
-    const raw = data.status || data.situacao || "desconhecido";
-    return { raw, category: classifyStatus(raw), details: data };
+    if (data.status === "not_found") {
+      return { raw: "não encontrado", category: null, details: data };
+    }
+    if (data.status === "no_events" || !data.eventoMaisRecente) {
+      return { raw: "sem eventos ainda", category: null, details: data };
+    }
+    const ev = data.eventoMaisRecente;
+    const raw = [ev.descricao, ev.local].filter(Boolean).join(" — ");
+    // BDE/BDI/BDR são os códigos Correios de entrega concluída
+    const category = ["BDE", "BDI", "BDR"].includes(ev.codigo) ? "entregue" : classifyStatus(ev.descricao);
+    return { raw, category, details: data };
   } catch (e: any) {
     return { raw: "indisponivel", category: null, details: { error: e.message } };
   }
@@ -196,16 +202,21 @@ export async function PUT(request: NextRequest) {
 
     if (action === "refresh") {
       const result = await fetchTrackingStatus(existing.trackingCode);
+      if (!result) {
+        return NextResponse.json({ error: "SEU_RASTREIO_API_KEY não configurada no servidor" }, { status: 503 });
+      }
+      // Falha temporária (limite/indisponível) não apaga um status já conhecido
+      const failed = ["indisponivel", "limite_atingido"].includes(result.raw);
       const updated = await prisma.trackingOrder.update({
         where: { id },
         data: {
-          statusRaw: result?.raw || "indisponivel",
-          statusCategory: result?.category ?? existing.statusCategory,
-          statusDetails: result ? JSON.stringify(result.details) : existing.statusDetails,
+          statusRaw: failed && existing.statusRaw ? existing.statusRaw : result.raw,
+          statusCategory: result.category ?? existing.statusCategory,
+          statusDetails: failed ? existing.statusDetails : JSON.stringify(result.details),
           lastCheckedAt: new Date(),
         },
       });
-      return NextResponse.json(updated);
+      return NextResponse.json({ ...updated, refreshFailed: failed, refreshRaw: result.raw });
     }
 
     if (action === "set_status") {

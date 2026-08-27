@@ -279,3 +279,18 @@
 .rastreio-bulk-resultado ul {
   margin: 6px 0 0 18px;
 }
+
+.rastreio-status-raw {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+}
+
+.rastreio-btn-secundario:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

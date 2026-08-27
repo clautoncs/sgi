@@ -65,6 +65,7 @@ export default function RastreioPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [refreshAllProgress, setRefreshAllProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -183,6 +184,29 @@ export default function RastreioPage() {
     }
   }
 
+  // Atualiza todos os códigos ainda não entregues, um a um, respeitando o
+  // limite de 10 consultas/minuto da API (1 consulta a cada 6,5s).
+  async function refreshAll() {
+    const pending = orders.filter((o) => o.statusCategory !== "entregue" && !o.archived);
+    if (pending.length === 0) return;
+    setRefreshAllProgress({ done: 0, total: pending.length });
+    for (let i = 0; i < pending.length; i++) {
+      try {
+        await fetch("/api/rastreio", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: pending[i].id, action: "refresh" }),
+        });
+      } catch {}
+      setRefreshAllProgress({ done: i + 1, total: pending.length });
+      if (i < pending.length - 1) {
+        await new Promise((r) => setTimeout(r, 6500));
+      }
+    }
+    setRefreshAllProgress(null);
+    fetchOrders();
+  }
+
   async function setStatus(id: string, statusCategory: string) {
     const res = await fetch("/api/rastreio", {
       method: "PUT",
@@ -222,6 +246,11 @@ export default function RastreioPage() {
       <div className="rastreio-header">
         <h1>Rastreio de Pedidos</h1>
         <div className="rastreio-header-btns">
+          <button className="rastreio-btn-secundario" onClick={refreshAll} disabled={!!refreshAllProgress}>
+            {refreshAllProgress
+              ? `🔄 Consultando ${refreshAllProgress.done}/${refreshAllProgress.total}...`
+              : "🔄 Atualizar Todos"}
+          </button>
           <button className="rastreio-btn-secundario" onClick={() => { setBulkText(""); setBulkResult(null); setBulkOpen(true); }}>
             📋 Colar da Planilha
           </button>
@@ -287,6 +316,9 @@ export default function RastreioPage() {
                         <option key={s.value} value={s.value}>{s.label}</option>
                       ))}
                     </select>
+                    {o.statusRaw && (
+                      <div className="rastreio-status-raw" title={o.statusRaw}>{o.statusRaw}</div>
+                    )}
                   </td>
                   <td>
                     <div className="rastreio-tabela-acoes">
