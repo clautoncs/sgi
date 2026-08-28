@@ -54,11 +54,25 @@ type SortKey =
   | "productName" | "quantity" | "unitValue" | "realValue" | "realQuantity"
   | "trackingCode" | "statusCategory";
 
-// Valor considerado do item: valor real se preenchido, senão valor × qtd da planilha
+// Colunas que o usuário pode ocultar pra caber na tela
+const TOGGLABLE_COLUMNS: { key: string; label: string }[] = [
+  { key: "orderDate", label: "Data" },
+  { key: "buyerPerson", label: "Pessoa" },
+  { key: "accountName", label: "Conta" },
+  { key: "sellerName", label: "Vendedor" },
+  { key: "externalOrderId", label: "Pedido" },
+  { key: "productName", label: "Compra" },
+  { key: "quantity", label: "Quan." },
+  { key: "unitValue", label: "Frete" },
+  { key: "realValue", label: "Valor Real" },
+  { key: "realQuantity", label: "Qtd. Real" },
+  { key: "custoUnitReal", label: "Custo Unit. Real" },
+];
+
+// Valor considerado do item: o Valor Real informado (total da compra).
+// A coluna VALOR da planilha é o frete, não entra nesses totais.
 function itemValue(o: TrackingOrder): number {
-  if (o.realValue != null) return o.realValue;
-  if (o.unitValue != null && o.quantity != null) return o.unitValue * o.quantity;
-  return 0;
+  return o.realValue ?? 0;
 }
 
 function itemQty(o: TrackingOrder): number {
@@ -85,10 +99,41 @@ export default function RastreioPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [compact, setCompact] = useState(false);
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
+  const [colsMenuOpen, setColsMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchOrders();
   }, [showArchived]);
+
+  // Preferências de exibição salvas no navegador
+  useEffect(() => {
+    try {
+      setCompact(localStorage.getItem("rastreio-compact") === "1");
+      const saved = localStorage.getItem("rastreio-hidden-cols");
+      if (saved) setHiddenCols(new Set(JSON.parse(saved)));
+    } catch {}
+  }, []);
+
+  function toggleCompact() {
+    const next = !compact;
+    setCompact(next);
+    try { localStorage.setItem("rastreio-compact", next ? "1" : "0"); } catch {}
+  }
+
+  function toggleCol(key: string) {
+    setHiddenCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try { localStorage.setItem("rastreio-hidden-cols", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  const show = (key: string) => !hiddenCols.has(key);
+  const visibleColCount = 4 + TOGGLABLE_COLUMNS.filter((c) => show(c.key)).length; // expand + Rastreamento + Status + Ações fixas
 
   async function fetchOrders() {
     setLoading(true);
@@ -449,6 +494,24 @@ export default function RastreioPage() {
             Todos (com arquivados)
           </button>
         </div>
+        <button className={`rastreio-filtro-btn ${compact ? "active" : ""}`} onClick={toggleCompact} title="Diminui fonte e espaçamento pra caber mais na tela">
+          {compact ? "🗜 Compacto" : "🗜 Normal"}
+        </button>
+        <div className="rastreio-cols-wrap">
+          <button className="rastreio-filtro-btn" onClick={() => setColsMenuOpen(!colsMenuOpen)}>
+            ⚙️ Colunas {hiddenCols.size > 0 ? `(${TOGGLABLE_COLUMNS.length - hiddenCols.size}/${TOGGLABLE_COLUMNS.length})` : ""}
+          </button>
+          {colsMenuOpen && (
+            <div className="rastreio-cols-menu">
+              {TOGGLABLE_COLUMNS.map((c) => (
+                <label key={c.key}>
+                  <input type="checkbox" checked={show(c.key)} onChange={() => toggleCol(c.key)} />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -457,21 +520,21 @@ export default function RastreioPage() {
         <div className="rastreio-vazio">Nenhum pedido encontrado.</div>
       ) : (
         <div className="rastreio-tabela-wrap">
-          <table className="rastreio-tabela">
+          <table className={`rastreio-tabela ${compact ? "rastreio-tabela--compact" : ""}`}>
             <thead>
               <tr>
                 <th></th>
-                <th className="sortable" onClick={() => toggleSort("orderDate")}>Data{sortIndicator("orderDate")}</th>
-                <th className="sortable" onClick={() => toggleSort("buyerPerson")}>Pessoa{sortIndicator("buyerPerson")}</th>
-                <th className="sortable" onClick={() => toggleSort("accountName")}>Conta{sortIndicator("accountName")}</th>
-                <th className="sortable" onClick={() => toggleSort("sellerName")}>Vendedor{sortIndicator("sellerName")}</th>
-                <th className="sortable" onClick={() => toggleSort("externalOrderId")}>Pedido{sortIndicator("externalOrderId")}</th>
-                <th className="sortable" onClick={() => toggleSort("productName")}>Compra{sortIndicator("productName")}</th>
-                <th className="sortable" onClick={() => toggleSort("quantity")}>Quan.{sortIndicator("quantity")}</th>
-                <th className="sortable" onClick={() => toggleSort("unitValue")}>Valor{sortIndicator("unitValue")}</th>
-                <th className="sortable" onClick={() => toggleSort("realValue")}>Valor Real{sortIndicator("realValue")}</th>
-                <th className="sortable" onClick={() => toggleSort("realQuantity")}>Qtd. Real{sortIndicator("realQuantity")}</th>
-                <th>Custo Unit. Real</th>
+                {show("orderDate") && <th className="sortable" onClick={() => toggleSort("orderDate")}>Data{sortIndicator("orderDate")}</th>}
+                {show("buyerPerson") && <th className="sortable" onClick={() => toggleSort("buyerPerson")}>Pessoa{sortIndicator("buyerPerson")}</th>}
+                {show("accountName") && <th className="sortable" onClick={() => toggleSort("accountName")}>Conta{sortIndicator("accountName")}</th>}
+                {show("sellerName") && <th className="sortable" onClick={() => toggleSort("sellerName")}>Vendedor{sortIndicator("sellerName")}</th>}
+                {show("externalOrderId") && <th className="sortable" onClick={() => toggleSort("externalOrderId")}>Pedido{sortIndicator("externalOrderId")}</th>}
+                {show("productName") && <th className="sortable" onClick={() => toggleSort("productName")}>Compra{sortIndicator("productName")}</th>}
+                {show("quantity") && <th className="sortable" onClick={() => toggleSort("quantity")}>Quan.{sortIndicator("quantity")}</th>}
+                {show("unitValue") && <th className="sortable" onClick={() => toggleSort("unitValue")}>Frete{sortIndicator("unitValue")}</th>}
+                {show("realValue") && <th className="sortable" onClick={() => toggleSort("realValue")}>Valor Real{sortIndicator("realValue")}</th>}
+                {show("realQuantity") && <th className="sortable" onClick={() => toggleSort("realQuantity")}>Qtd. Real{sortIndicator("realQuantity")}</th>}
+                {show("custoUnitReal") && <th>Custo Unit. Real</th>}
                 <th className="sortable" onClick={() => toggleSort("trackingCode")}>Rastreamento{sortIndicator("trackingCode")}</th>
                 <th className="sortable" onClick={() => toggleSort("statusCategory")}>Status{sortIndicator("statusCategory")}</th>
                 <th>Ações</th>
@@ -495,37 +558,41 @@ export default function RastreioPage() {
                           {expandedId === o.id ? "−" : "+"}
                         </button>
                       </td>
-                      <td>{formatDate(o.orderDate)}</td>
-                      <td>{o.buyerPerson}</td>
-                      <td>{o.accountName || "—"}</td>
-                      <td>{o.sellerName || "—"}</td>
-                      <td className="mono">{o.externalOrderId || "—"}</td>
-                      <td>{o.productName}</td>
-                      <td>{o.quantity ?? "—"}</td>
-                      <td>{formatCurrency(o.unitValue)}</td>
-                      <td>
-                        <input
-                          key={`rv-${o.id}-${o.realValue}`}
-                          type="text"
-                          inputMode="decimal"
-                          className="rastreio-inline-input"
-                          placeholder="—"
-                          defaultValue={o.realValue != null ? String(o.realValue).replace(".", ",") : ""}
-                          onBlur={(e) => saveRealField(o.id, "realValue", e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          key={`rq-${o.id}-${o.realQuantity}`}
-                          type="text"
-                          inputMode="numeric"
-                          className="rastreio-inline-input rastreio-inline-input--qty"
-                          placeholder="—"
-                          defaultValue={o.realQuantity != null ? String(o.realQuantity) : ""}
-                          onBlur={(e) => saveRealField(o.id, "realQuantity", e.target.value)}
-                        />
-                      </td>
-                      <td>{custoUnit != null ? formatCurrency(custoUnit) : "—"}</td>
+                      {show("orderDate") && <td>{formatDate(o.orderDate)}</td>}
+                      {show("buyerPerson") && <td>{o.buyerPerson}</td>}
+                      {show("accountName") && <td>{o.accountName || "—"}</td>}
+                      {show("sellerName") && <td>{o.sellerName || "—"}</td>}
+                      {show("externalOrderId") && <td className="mono">{o.externalOrderId || "—"}</td>}
+                      {show("productName") && <td className="rastreio-col-compra">{o.productName}</td>}
+                      {show("quantity") && <td>{o.quantity ?? "—"}</td>}
+                      {show("unitValue") && <td>{formatCurrency(o.unitValue)}</td>}
+                      {show("realValue") && (
+                        <td>
+                          <input
+                            key={`rv-${o.id}-${o.realValue}`}
+                            type="text"
+                            inputMode="decimal"
+                            className="rastreio-inline-input"
+                            placeholder="—"
+                            defaultValue={o.realValue != null ? String(o.realValue).replace(".", ",") : ""}
+                            onBlur={(e) => saveRealField(o.id, "realValue", e.target.value)}
+                          />
+                        </td>
+                      )}
+                      {show("realQuantity") && (
+                        <td>
+                          <input
+                            key={`rq-${o.id}-${o.realQuantity}`}
+                            type="text"
+                            inputMode="numeric"
+                            className="rastreio-inline-input rastreio-inline-input--qty"
+                            placeholder="—"
+                            defaultValue={o.realQuantity != null ? String(o.realQuantity) : ""}
+                            onBlur={(e) => saveRealField(o.id, "realQuantity", e.target.value)}
+                          />
+                        </td>
+                      )}
+                      {show("custoUnitReal") && <td>{custoUnit != null ? formatCurrency(custoUnit) : "—"}</td>}
                       <td className="mono">{o.trackingCode}</td>
                       <td>
                         <select
@@ -557,7 +624,7 @@ export default function RastreioPage() {
                     </tr>
                     {expandedId === o.id && (
                       <tr key={`${o.id}-hist`} className="rastreio-hist-row">
-                        <td colSpan={15}>
+                        <td colSpan={visibleColCount}>
                           <div className="rastreio-hist">
                             <strong>Histórico de {o.trackingCode}</strong>
                             {o.lastCheckedAt && (
@@ -627,7 +694,7 @@ export default function RastreioPage() {
                 <input type="text" inputMode="numeric" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
               </div>
               <div className="rastreio-form-group">
-                <label>Valor (unitário)</label>
+                <label>Frete (R$)</label>
                 <input type="text" inputMode="decimal" placeholder="0,00" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} />
               </div>
               <div className="rastreio-form-group">
