@@ -80,8 +80,14 @@ export async function refreshOrder(
 // Rotina da atualização automática: consulta todos os pendentes (não
 // entregues, não arquivados), um a um, respeitando o limite de 10/min.
 export async function refreshAllPending(prisma: PrismaClient): Promise<{ checked: number; failures: number }> {
+  // OR explícito porque NOT equals em campo nullable exclui os NULL no SQL —
+  // e os sem categoria (ex.: "não encontrado") são justamente os que mais
+  // precisam de reconsulta
   const pending = await prisma.trackingOrder.findMany({
-    where: { archived: false, NOT: { statusCategory: "entregue" } },
+    where: {
+      archived: false,
+      OR: [{ statusCategory: null }, { statusCategory: { not: "entregue" } }],
+    },
     orderBy: { lastCheckedAt: "asc" },
     select: { id: true, trackingCode: true, statusRaw: true, statusCategory: true, statusDetails: true },
   });
