@@ -294,3 +294,198 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* Cards de resumo (financeiro e status) */
+.rastreio-cards {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rastreio-cards--money {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.rastreio-cards--status {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.rastreio-money-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rastreio-money-card--recebido { border-left-color: #16a34a; }
+.rastreio-money-card--barrado { border-left-color: #dc2626; }
+.rastreio-money-card--caminho { border-left-color: #d97706; }
+.rastreio-money-card--custo { border-left-color: #2563eb; }
+
+.rastreio-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rastreio-card-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.rastreio-money-card--recebido .rastreio-card-value { color: #16a34a; }
+.rastreio-money-card--barrado .rastreio-card-value { color: #dc2626; }
+
+.rastreio-card-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rastreio-status-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rastreio-status-card:hover {
+  border-color: var(--accent);
+}
+
+.rastreio-status-card--active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(77, 159, 255, 0.25);
+}
+
+.rastreio-card-icon { font-size: 16px; }
+
+.rastreio-card-count {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.rastreio-status-card--postado .rastreio-card-count { color: #2563eb; }
+.rastreio-status-card--em_transito .rastreio-card-count { color: #d97706; }
+.rastreio-status-card--barrado .rastreio-card-count { color: #dc2626; }
+.rastreio-status-card--entregue .rastreio-card-count { color: #16a34a; }
+.rastreio-status-card--sem_status .rastreio-card-count { color: var(--muted); }
+
+/* Barra de busca */
+.rastreio-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.rastreio-busca {
+  flex: 1;
+  min-width: 260px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  font-size: 14px;
+}
+
+.rastreio-toolbar .rastreio-filtros {
+  margin-bottom: 0;
+}
+
+/* Cabeçalhos ordenáveis */
+.rastreio-tabela th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.rastreio-tabela th.sortable:hover {
+  color: var(--accent);
+}
+
+/* Botão + de expandir histórico */
+.rastreio-expand-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.rastreio-expand-btn:hover {
+  border-color: var(--accent);
+}
+
+/* Linha expandida do histórico */
+.rastreio-hist-row td {
+  background: var(--bg);
+}
+
+.rastreio-hist {
+  padding: 10px 14px;
+  white-space: normal;
+}
+
+.rastreio-hist-checked {
+  margin-left: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rastreio-hist ul {
+  margin: 8px 0 4px 0;
+  list-style: none;
+  padding: 0;
+}
+
+.rastreio-hist li {
+  display: flex;
+  gap: 14px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 12.5px;
+  flex-wrap: wrap;
+}
+
+.rastreio-hist li:last-child { border-bottom: none; }
+
+.rastreio-hist-data {
+  color: var(--muted);
+  font-family: monospace;
+  min-width: 140px;
+}
+
+.rastreio-hist-desc { font-weight: 500; }
+
+.rastreio-hist-local { color: var(--muted); }
+
+.rastreio-hist-vazio {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+
+/* Inputs inline de valor real / qtd real */
+.rastreio-inline-input {
+  width: 90px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--input-border);
+  font-size: 12.5px;
+}
+
+.rastreio-inline-input--qty { width: 60px; }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import "./rastreio.css";
 
 interface TrackingOrder {
@@ -12,12 +12,15 @@ interface TrackingOrder {
   productName: string;
   quantity: number | null;
   unitValue: number | null;
+  realValue: number | null;
+  realQuantity: number | null;
   paymentMethod: string | null;
   shippingAddress: string | null;
   trackingCode: string;
   notes: string | null;
   statusCategory: string | null;
   statusRaw: string | null;
+  statusDetails: string | null;
   lastCheckedAt: string | null;
   archived: boolean;
   createdAt: string;
@@ -30,11 +33,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "barrado", label: "Barrado / Proibido / Devolvido" },
   { value: "entregue", label: "Entregue" },
 ];
-
-function statusLabel(status: string | null): string {
-  if (!status) return "Sem status";
-  return STATUS_OPTIONS.find((s) => s.value === status)?.label || status;
-}
 
 const emptyForm = {
   orderDate: "",
@@ -51,6 +49,22 @@ const emptyForm = {
   notes: "",
 };
 
+type SortKey =
+  | "orderDate" | "buyerPerson" | "accountName" | "sellerName" | "externalOrderId"
+  | "productName" | "quantity" | "unitValue" | "realValue" | "realQuantity"
+  | "trackingCode" | "statusCategory";
+
+// Valor considerado do item: valor real se preenchido, senão valor × qtd da planilha
+function itemValue(o: TrackingOrder): number {
+  if (o.realValue != null) return o.realValue;
+  if (o.unitValue != null && o.quantity != null) return o.unitValue * o.quantity;
+  return 0;
+}
+
+function itemQty(o: TrackingOrder): number {
+  return o.realQuantity ?? o.quantity ?? 0;
+}
+
 export default function RastreioPage() {
   const [orders, setOrders] = useState<TrackingOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +80,11 @@ export default function RastreioPage() {
   const [error, setError] = useState("");
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [refreshAllProgress, setRefreshAllProgress] = useState<{ done: number; total: number } | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     fetchOrders();
@@ -86,6 +105,89 @@ export default function RastreioPage() {
     }
   }
 
+  // ---- filtro + busca + ordenação ----
+  const filtered = useMemo(() => {
+    let list = orders;
+    if (statusFilter === "sem_status") {
+      list = list.filter((o) => !o.statusCategory);
+    } else if (statusFilter) {
+      list = list.filter((o) => o.statusCategory === statusFilter);
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((o) =>
+        [
+          o.buyerPerson, o.accountName, o.sellerName, o.externalOrderId,
+          o.productName, o.paymentMethod, o.shippingAddress, o.trackingCode,
+          o.notes, o.statusRaw,
+          o.orderDate ? new Date(o.orderDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null,
+          o.quantity != null ? String(o.quantity) : null,
+          o.unitValue != null ? String(o.unitValue) : null,
+        ]
+          .filter(Boolean)
+          .some((f) => (f as string).toLowerCase().includes(q))
+      );
+    }
+    if (sortKey) {
+      const dir = sortDir === "asc" ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        let va: any = a[sortKey];
+        let vb: any = b[sortKey];
+        if (sortKey === "orderDate") {
+          va = va ? new Date(va).getTime() : 0;
+          vb = vb ? new Date(vb).getTime() : 0;
+        }
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), "pt-BR", { numeric: true, sensitivity: "base" }) * dir;
+      });
+    }
+    return list;
+  }, [orders, statusFilter, search, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function sortIndicator(key: SortKey) {
+    if (sortKey !== key) return "";
+    return sortDir === "asc" ? " ▲" : " ▼";
+  }
+
+  // ---- contadores e totais financeiros ----
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { todos: orders.length, postado: 0, em_transito: 0, barrado: 0, entregue: 0, sem_status: 0 };
+    for (const o of orders) {
+      if (o.statusCategory && c[o.statusCategory] !== undefined) c[o.statusCategory]++;
+      else c.sem_status++;
+    }
+    return c;
+  }, [orders]);
+
+  const totals = useMemo(() => {
+    let recebido = 0, barrado = 0, caminho = 0, qtdRecebida = 0;
+    for (const o of orders) {
+      const v = itemValue(o);
+      if (o.statusCategory === "entregue") {
+        recebido += v;
+        qtdRecebida += itemQty(o);
+      } else if (o.statusCategory === "barrado") {
+        barrado += v;
+      } else {
+        caminho += v;
+      }
+    }
+    return { recebido, barrado, caminho, custoUnitReal: qtdRecebida > 0 ? recebido / qtdRecebida : 0 };
+  }, [orders]);
+
+  // ---- ações ----
   function openNovo() {
     setEditingId(null);
     setForm(emptyForm);
@@ -216,6 +318,20 @@ export default function RastreioPage() {
     if (res.ok) fetchOrders();
   }
 
+  // Salva valor real / quantidade real digitados direto na célula
+  async function saveRealField(id: string, field: "realValue" | "realQuantity", value: string) {
+    const parsed = value.trim() === "" ? null : Number(value.replace(",", "."));
+    const res = await fetch("/api/rastreio", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, [field]: parsed }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, [field]: updated[field] } : o)));
+    }
+  }
+
   async function arquivar(id: string, archived: boolean) {
     const res = await fetch("/api/rastreio", {
       method: "PUT",
@@ -241,6 +357,24 @@ export default function RastreioPage() {
     return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
   }
 
+  function parseHistorico(o: TrackingOrder): { descricao: string; data: string | null; local: string | null }[] {
+    try {
+      const d = JSON.parse(o.statusDetails || "{}");
+      if (Array.isArray(d.historico) && d.historico.length > 0) return d.historico;
+      if (d.eventoMaisRecente) return [d.eventoMaisRecente];
+    } catch {}
+    return [];
+  }
+
+  const statusCards: { key: string; label: string; icon: string; cls: string }[] = [
+    { key: "todos", label: "Todos", icon: "📦", cls: "todos" },
+    { key: "postado", label: "Postados", icon: "🔵", cls: "postado" },
+    { key: "em_transito", label: "A Caminho", icon: "🟡", cls: "em_transito" },
+    { key: "barrado", label: "Barrados", icon: "🔴", cls: "barrado" },
+    { key: "entregue", label: "Entregues", icon: "🟢", cls: "entregue" },
+    { key: "sem_status", label: "Sem Status", icon: "⚪", cls: "sem_status" },
+  ];
+
   return (
     <div className="rastreio-container">
       <div className="rastreio-header">
@@ -258,82 +392,201 @@ export default function RastreioPage() {
         </div>
       </div>
 
-      <div className="rastreio-filtros">
-        <button className={`rastreio-filtro-btn ${!showArchived ? "active" : ""}`} onClick={() => setShowArchived(false)}>
-          Ativos
-        </button>
-        <button className={`rastreio-filtro-btn ${showArchived ? "active" : ""}`} onClick={() => setShowArchived(true)}>
-          Todos (com arquivados)
-        </button>
+      {/* Linha financeira: valores reais por classificação */}
+      <div className="rastreio-cards rastreio-cards--money">
+        <div className="rastreio-money-card rastreio-money-card--recebido">
+          <span className="rastreio-card-label">Valor Real Recebido</span>
+          <span className="rastreio-card-value">{formatCurrency(totals.recebido)}</span>
+          <span className="rastreio-card-sub">itens entregues</span>
+        </div>
+        <div className="rastreio-money-card rastreio-money-card--barrado">
+          <span className="rastreio-card-label">Valor Real Barrado</span>
+          <span className="rastreio-card-value">{formatCurrency(totals.barrado)}</span>
+          <span className="rastreio-card-sub">itens barrados / devolvidos</span>
+        </div>
+        <div className="rastreio-money-card rastreio-money-card--caminho">
+          <span className="rastreio-card-label">Valor a Caminho</span>
+          <span className="rastreio-card-value">{formatCurrency(totals.caminho)}</span>
+          <span className="rastreio-card-sub">postados + em trânsito + sem status</span>
+        </div>
+        <div className="rastreio-money-card rastreio-money-card--custo">
+          <span className="rastreio-card-label">Custo Unitário Real</span>
+          <span className="rastreio-card-value">{totals.custoUnitReal > 0 ? formatCurrency(totals.custoUnitReal) : "—"}</span>
+          <span className="rastreio-card-sub">recebido ÷ qtd. real entregue</span>
+        </div>
+      </div>
+
+      {/* Fileira de quadrados: contagem por status, clicáveis pra filtrar */}
+      <div className="rastreio-cards rastreio-cards--status">
+        {statusCards.map((c) => (
+          <button
+            key={c.key}
+            className={`rastreio-status-card rastreio-status-card--${c.cls} ${
+              (c.key === "todos" && !statusFilter) || statusFilter === c.key ? "rastreio-status-card--active" : ""
+            }`}
+            onClick={() => setStatusFilter(c.key === "todos" ? null : c.key)}
+          >
+            <span className="rastreio-card-icon">{c.icon}</span>
+            <span className="rastreio-card-count">{counts[c.key] ?? 0}</span>
+            <span className="rastreio-card-label">{c.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="rastreio-toolbar">
+        <input
+          type="text"
+          className="rastreio-busca"
+          placeholder="🔍 Buscar por qualquer trecho: pessoa, produto, código, pedido, endereço..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="rastreio-filtros">
+          <button className={`rastreio-filtro-btn ${!showArchived ? "active" : ""}`} onClick={() => setShowArchived(false)}>
+            Ativos
+          </button>
+          <button className={`rastreio-filtro-btn ${showArchived ? "active" : ""}`} onClick={() => setShowArchived(true)}>
+            Todos (com arquivados)
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="rastreio-loading">Carregando...</div>
-      ) : orders.length === 0 ? (
-        <div className="rastreio-vazio">Nenhum pedido cadastrado ainda.</div>
+      ) : filtered.length === 0 ? (
+        <div className="rastreio-vazio">Nenhum pedido encontrado.</div>
       ) : (
         <div className="rastreio-tabela-wrap">
           <table className="rastreio-tabela">
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Pessoa</th>
-                <th>Conta</th>
-                <th>Vendedor</th>
-                <th>Pedido</th>
-                <th>Compra</th>
-                <th>Quan.</th>
-                <th>Valor</th>
-                <th>Pagam.</th>
-                <th>Endereço</th>
-                <th>Rastreamento</th>
-                <th>Status</th>
+                <th></th>
+                <th className="sortable" onClick={() => toggleSort("orderDate")}>Data{sortIndicator("orderDate")}</th>
+                <th className="sortable" onClick={() => toggleSort("buyerPerson")}>Pessoa{sortIndicator("buyerPerson")}</th>
+                <th className="sortable" onClick={() => toggleSort("accountName")}>Conta{sortIndicator("accountName")}</th>
+                <th className="sortable" onClick={() => toggleSort("sellerName")}>Vendedor{sortIndicator("sellerName")}</th>
+                <th className="sortable" onClick={() => toggleSort("externalOrderId")}>Pedido{sortIndicator("externalOrderId")}</th>
+                <th className="sortable" onClick={() => toggleSort("productName")}>Compra{sortIndicator("productName")}</th>
+                <th className="sortable" onClick={() => toggleSort("quantity")}>Quan.{sortIndicator("quantity")}</th>
+                <th className="sortable" onClick={() => toggleSort("unitValue")}>Valor{sortIndicator("unitValue")}</th>
+                <th className="sortable" onClick={() => toggleSort("realValue")}>Valor Real{sortIndicator("realValue")}</th>
+                <th className="sortable" onClick={() => toggleSort("realQuantity")}>Qtd. Real{sortIndicator("realQuantity")}</th>
+                <th>Custo Unit. Real</th>
+                <th className="sortable" onClick={() => toggleSort("trackingCode")}>Rastreamento{sortIndicator("trackingCode")}</th>
+                <th className="sortable" onClick={() => toggleSort("statusCategory")}>Status{sortIndicator("statusCategory")}</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td>{formatDate(o.orderDate)}</td>
-                  <td>{o.buyerPerson}</td>
-                  <td>{o.accountName || "—"}</td>
-                  <td>{o.sellerName || "—"}</td>
-                  <td className="mono">{o.externalOrderId || "—"}</td>
-                  <td>{o.productName}</td>
-                  <td>{o.quantity ?? "—"}</td>
-                  <td>{formatCurrency(o.unitValue)}</td>
-                  <td>{o.paymentMethod || "—"}</td>
-                  <td>{o.shippingAddress || "—"}</td>
-                  <td className="mono">{o.trackingCode}</td>
-                  <td>
-                    <select
-                      className={`rastreio-status-select status-${o.statusCategory || "sem_status"}`}
-                      value={o.statusCategory || ""}
-                      onChange={(e) => setStatus(o.id, e.target.value)}
-                    >
-                      <option value="">Sem status</option>
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                    {o.statusRaw && (
-                      <div className="rastreio-status-raw" title={o.statusRaw}>{o.statusRaw}</div>
+              {filtered.map((o) => {
+                const historico = expandedId === o.id ? parseHistorico(o) : [];
+                const custoUnit = o.realValue != null && (o.realQuantity ?? o.quantity)
+                  ? o.realValue / (o.realQuantity ?? o.quantity!)
+                  : null;
+                return (
+                  <>
+                    <tr key={o.id}>
+                      <td>
+                        <button
+                          className="rastreio-expand-btn"
+                          onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                          title="Ver histórico do rastreio"
+                        >
+                          {expandedId === o.id ? "−" : "+"}
+                        </button>
+                      </td>
+                      <td>{formatDate(o.orderDate)}</td>
+                      <td>{o.buyerPerson}</td>
+                      <td>{o.accountName || "—"}</td>
+                      <td>{o.sellerName || "—"}</td>
+                      <td className="mono">{o.externalOrderId || "—"}</td>
+                      <td>{o.productName}</td>
+                      <td>{o.quantity ?? "—"}</td>
+                      <td>{formatCurrency(o.unitValue)}</td>
+                      <td>
+                        <input
+                          key={`rv-${o.id}-${o.realValue}`}
+                          type="text"
+                          inputMode="decimal"
+                          className="rastreio-inline-input"
+                          placeholder="—"
+                          defaultValue={o.realValue != null ? String(o.realValue).replace(".", ",") : ""}
+                          onBlur={(e) => saveRealField(o.id, "realValue", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          key={`rq-${o.id}-${o.realQuantity}`}
+                          type="text"
+                          inputMode="numeric"
+                          className="rastreio-inline-input rastreio-inline-input--qty"
+                          placeholder="—"
+                          defaultValue={o.realQuantity != null ? String(o.realQuantity) : ""}
+                          onBlur={(e) => saveRealField(o.id, "realQuantity", e.target.value)}
+                        />
+                      </td>
+                      <td>{custoUnit != null ? formatCurrency(custoUnit) : "—"}</td>
+                      <td className="mono">{o.trackingCode}</td>
+                      <td>
+                        <select
+                          className={`rastreio-status-select status-${o.statusCategory || "sem_status"}`}
+                          value={o.statusCategory || ""}
+                          onChange={(e) => setStatus(o.id, e.target.value)}
+                        >
+                          <option value="">Sem status</option>
+                          {STATUS_OPTIONS.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                        {o.statusRaw && (
+                          <div className="rastreio-status-raw" title={o.statusRaw}>{o.statusRaw}</div>
+                        )}
+                      </td>
+                      <td>
+                        <div className="rastreio-tabela-acoes">
+                          <button onClick={() => refreshStatus(o.id)} disabled={refreshingId === o.id} title="Atualizar via API">
+                            {refreshingId === o.id ? "..." : "🔄"}
+                          </button>
+                          <button onClick={() => openEditar(o)} title="Editar">✏️</button>
+                          <button onClick={() => arquivar(o.id, o.archived)} title={o.archived ? "Reativar" : "Arquivar"}>
+                            {o.archived ? "↩️" : "📥"}
+                          </button>
+                          <button onClick={() => excluir(o.id)} title="Excluir">🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedId === o.id && (
+                      <tr key={`${o.id}-hist`} className="rastreio-hist-row">
+                        <td colSpan={15}>
+                          <div className="rastreio-hist">
+                            <strong>Histórico de {o.trackingCode}</strong>
+                            {o.lastCheckedAt && (
+                              <span className="rastreio-hist-checked">
+                                última consulta: {new Date(o.lastCheckedAt).toLocaleString("pt-BR")}
+                              </span>
+                            )}
+                            {historico.length === 0 ? (
+                              <p className="rastreio-hist-vazio">Nenhum evento registrado ainda — clique em 🔄 pra consultar.</p>
+                            ) : (
+                              <ul>
+                                {historico.map((h, i) => (
+                                  <li key={i}>
+                                    <span className="rastreio-hist-data">
+                                      {h.data ? new Date(h.data).toLocaleString("pt-BR") : "—"}
+                                    </span>
+                                    <span className="rastreio-hist-desc">{h.descricao}</span>
+                                    {h.local && <span className="rastreio-hist-local">{h.local}</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td>
-                    <div className="rastreio-tabela-acoes">
-                      <button onClick={() => refreshStatus(o.id)} disabled={refreshingId === o.id} title="Atualizar via API">
-                        {refreshingId === o.id ? "..." : "🔄"}
-                      </button>
-                      <button onClick={() => openEditar(o)} title="Editar">✏️</button>
-                      <button onClick={() => arquivar(o.id, o.archived)} title={o.archived ? "Reativar" : "Arquivar"}>
-                        {o.archived ? "↩️" : "📥"}
-                      </button>
-                      <button onClick={() => excluir(o.id)} title="Excluir">🗑</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>

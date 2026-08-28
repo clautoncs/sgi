@@ -184,6 +184,8 @@ model TrackingOrder {
   productName      String             // COMPRA
   quantity         Int?               // QUAN.
   unitValue        Float?             // VALOR (preço unitário pago)
+  realValue        Float?             // valor real (total efetivo da compra)
+  realQuantity     Int?               // quantidade real recebida
   paymentMethod    String?            // PAGAM (cartão/conta usada)
   shippingAddress  String?            // ENDEREÇO (endereço de entrega interno)
   trackingCode     String             // RASTREAMENTO, ex: NN349720023BR
