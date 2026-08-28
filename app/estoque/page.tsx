@@ -358,6 +358,7 @@ export default function EstoquePage() {
             <button className={`perfil-btn ${perfil === 'vendedor' ? 'active' : ''}`} onClick={() => setPerfil('vendedor')}>Vendedor</button>
           </div>
           <a href="/estoque/pedidos" className="btn-pedidos-link">📋 Pedidos</a>
+          <a href="/estoque/produtos" className="btn-pedidos-link">📦 Produtos</a>
           <button className="carrinho-btn" onClick={() => setCarrinhoAberto(!carrinhoAberto)}>
             🛒 <span className="carrinho-badge">{carrinho.length}</span>
           </button>

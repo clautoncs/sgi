@@ -171,6 +171,26 @@ model SystemSetting {
 }
 
 // ============================================================
+// PRODUTOS (cadastro interno pra controle de demanda/compras)
+// ============================================================
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  sku         String?            // código interno opcional
+  category    String?
+  notes       String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Os números (valor real, quantidade) vivem no rastreio; aqui é só a identidade
+  trackingOrders TrackingOrder[]
+
+  @@map("products")
+}
+
+// ============================================================
 // RASTREIO DE PEDIDOS (fornecedores / compras internacionais)
 // ============================================================
 
@@ -203,6 +223,9 @@ model TrackingOrder {
 
   createdBy        User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdById      String?
+
+  product          Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId        String?
 
   @@map("tracking_orders")
 }

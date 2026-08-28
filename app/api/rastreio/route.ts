@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   const orders = await prisma.trackingOrder.findMany({
     where: includeArchived ? {} : { archived: false },
     orderBy: { createdAt: "desc" },
-    include: { createdBy: { select: { name: true } } },
+    include: { createdBy: { select: { name: true } }, product: { select: { id: true, name: true } } },
   });
 
   return NextResponse.json({ orders });
@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
         paymentMethod: body.paymentMethod || null,
         shippingAddress: body.shippingAddress || null,
         trackingCode: body.trackingCode.trim().toUpperCase(),
+        productId: body.productId || null,
         realValue: body.realValue != null && body.realValue !== "" ? Number(body.realValue) : null,
         realQuantity: body.realQuantity != null && body.realQuantity !== "" ? Number(body.realQuantity) : null,
         notes: body.notes || null,
@@ -196,6 +197,7 @@ export async function PUT(request: NextRequest) {
     if (updates.paymentMethod !== undefined) data.paymentMethod = updates.paymentMethod;
     if (updates.shippingAddress !== undefined) data.shippingAddress = updates.shippingAddress;
     if (updates.trackingCode !== undefined) data.trackingCode = String(updates.trackingCode).trim().toUpperCase();
+    if (updates.productId !== undefined) data.productId = updates.productId || null;
     if (updates.realValue !== undefined) data.realValue = updates.realValue != null && updates.realValue !== "" ? Number(updates.realValue) : null;
     if (updates.realQuantity !== undefined) data.realQuantity = updates.realQuantity != null && updates.realQuantity !== "" ? Number(updates.realQuantity) : null;
     if (updates.notes !== undefined) data.notes = updates.notes;

@@ -25,6 +25,13 @@ interface TrackingOrder {
   archived: boolean;
   createdAt: string;
   createdBy: { name: string } | null;
+  productId?: string | null;
+  product?: { id: string; name: string } | null;
+}
+
+interface ProductOption {
+  id: string;
+  name: string;
 }
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -35,6 +42,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const emptyForm = {
+  productId: "",
   orderDate: "",
   buyerPerson: "",
   accountName: "",
@@ -62,6 +70,7 @@ const TOGGLABLE_COLUMNS: { key: string; label: string }[] = [
   { key: "sellerName", label: "Vendedor" },
   { key: "externalOrderId", label: "Pedido" },
   { key: "productName", label: "Compra" },
+  { key: "product", label: "Produto" },
   { key: "quantity", label: "Quan." },
   { key: "unitValue", label: "Frete" },
   { key: "realValue", label: "Valor Real" },
@@ -102,10 +111,18 @@ export default function RastreioPage() {
   const [compact, setCompact] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
   const [colsMenuOpen, setColsMenuOpen] = useState(false);
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
 
   useEffect(() => {
     fetchOrders();
   }, [showArchived]);
+
+  useEffect(() => {
+    fetch("/api/produtos")
+      .then((r) => (r.ok ? r.json() : { products: [] }))
+      .then((d) => setProductOptions((d.products || []).map((p: any) => ({ id: p.id, name: p.name }))))
+      .catch(() => {});
+  }, []);
 
   // Preferências de exibição salvas no navegador
   useEffect(() => {
@@ -164,7 +181,7 @@ export default function RastreioPage() {
         [
           o.buyerPerson, o.accountName, o.sellerName, o.externalOrderId,
           o.productName, o.paymentMethod, o.shippingAddress, o.trackingCode,
-          o.notes, o.statusRaw,
+          o.notes, o.statusRaw, o.product?.name,
           o.orderDate ? new Date(o.orderDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null,
           o.quantity != null ? String(o.quantity) : null,
           o.unitValue != null ? String(o.unitValue) : null,
@@ -243,6 +260,7 @@ export default function RastreioPage() {
   function openEditar(o: TrackingOrder) {
     setEditingId(o.id);
     setForm({
+      productId: o.productId || "",
       orderDate: o.orderDate ? o.orderDate.slice(0, 10) : "",
       buyerPerson: o.buyerPerson,
       accountName: o.accountName || "",
@@ -269,6 +287,7 @@ export default function RastreioPage() {
     setError("");
     try {
       const payload = {
+        productId: form.productId || null,
         orderDate: form.orderDate || null,
         buyerPerson: form.buyerPerson,
         accountName: form.accountName || null,
@@ -530,6 +549,7 @@ export default function RastreioPage() {
                 {show("sellerName") && <th className="sortable" onClick={() => toggleSort("sellerName")}>Vendedor{sortIndicator("sellerName")}</th>}
                 {show("externalOrderId") && <th className="sortable" onClick={() => toggleSort("externalOrderId")}>Pedido{sortIndicator("externalOrderId")}</th>}
                 {show("productName") && <th className="sortable" onClick={() => toggleSort("productName")}>Compra{sortIndicator("productName")}</th>}
+                {show("product") && <th>Produto</th>}
                 {show("quantity") && <th className="sortable" onClick={() => toggleSort("quantity")}>Quan.{sortIndicator("quantity")}</th>}
                 {show("unitValue") && <th className="sortable" onClick={() => toggleSort("unitValue")}>Frete{sortIndicator("unitValue")}</th>}
                 {show("realValue") && <th className="sortable" onClick={() => toggleSort("realValue")}>Valor Real{sortIndicator("realValue")}</th>}
@@ -564,6 +584,7 @@ export default function RastreioPage() {
                       {show("sellerName") && <td>{o.sellerName || "—"}</td>}
                       {show("externalOrderId") && <td className="mono">{o.externalOrderId || "—"}</td>}
                       {show("productName") && <td className="rastreio-col-compra">{o.productName}</td>}
+                      {show("product") && <td>{o.product?.name || "—"}</td>}
                       {show("quantity") && <td>{o.quantity ?? "—"}</td>}
                       {show("unitValue") && <td>{formatCurrency(o.unitValue)}</td>}
                       {show("realValue") && (
@@ -684,6 +705,15 @@ export default function RastreioPage() {
               <div className="rastreio-form-group">
                 <label>Pedido (nº)</label>
                 <input type="text" value={form.externalOrderId} onChange={(e) => setForm({ ...form, externalOrderId: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group rastreio-form-group--wide">
+                <label>Produto cadastrado (opcional — <a href="/estoque/produtos" target="_blank" rel="noreferrer">gerenciar</a>)</label>
+                <select value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
+                  <option value="">— nenhum —</option>
+                  {productOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="rastreio-form-group rastreio-form-group--wide">
                 <label>Compra</label>
