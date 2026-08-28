@@ -157,7 +157,7 @@ export default function ShopeePage() {
   const [itemForm, setItemForm] = useState({ description: "", quantity: "1", unitValue: "" });
   const [costSaving, setCostSaving] = useState(false);
   const [calcCostProductId, setCalcCostProductId] = useState("");
-  const [costModalOpen, setCostModalOpen] = useState(false);
+  const [histProductId, setHistProductId] = useState<string | null>(null);
 
   const [calcAffiliateEnabled, setCalcAffiliateEnabled] = useState(false);
   const [calcAffiliatePercent, setCalcAffiliatePercent] = useState("1");
@@ -464,8 +464,8 @@ export default function ShopeePage() {
   }, [status, activeTab, period, customFrom, customTo]);
 
   useEffect(() => {
-    if (activeTab === "calculator" || costModalOpen) fetchCostProducts();
-  }, [activeTab, costModalOpen]);
+    if (activeTab === "calculator") fetchCostProducts();
+  }, [activeTab]);
 
   const handleRefresh = () => {
     if (activeTab === "orders") trackProgress([fetchOrders()]);
@@ -1752,16 +1752,160 @@ export default function ShopeePage() {
       )}
 
       {/* CALCULADORA */}
-      {costModalOpen && (
-        <div className="cost-modal-overlay" onClick={() => setCostModalOpen(false)}>
-        <div className="cost-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="cost-modal-head">
-          <h2>Cadastro de Produtos (Orçamento de Custo)</h2>
-          <button className="cost-modal-close" onClick={() => setCostModalOpen(false)}>✕</button>
-        </div>
-        <div className="shopee-cost-products">
+
+      {activeTab === "calculator" && (
+        <div className="shopee-calculator">
+          <div className="calc-layout">
+            <div className="calc-col">
           <div className="config-card">
-            <h3>Cadastro de Produtos (Orçamento de Custo)</h3>
+            <h3>Calculadora de Preço e Margem</h3>
+            <p className="text-muted">Calcule o preço de venda ideal a partir da margem desejada, ou informe um valor de venda manual pra ver a margem resultante. Taxas ficam todas editáveis — ajuste conforme seu enquadramento.</p>
+
+            <div className="calc-toggle">
+              <button
+                type="button"
+                className={`calc-toggle__btn ${calcBusinessType === "cnpj" ? "calc-toggle__btn--active" : ""}`}
+                onClick={() => setCalcBusinessType("cnpj")}
+              >
+                🏢 CNPJ
+              </button>
+              <button
+                type="button"
+                className={`calc-toggle__btn ${calcBusinessType === "cpf" ? "calc-toggle__btn--active" : ""}`}
+                onClick={() => setCalcBusinessType("cpf")}
+              >
+                👤 CPF
+              </button>
+            </div>
+
+            <div className="calc-grid">
+              <div className="form-group">
+                <label>Produto cadastrado (orçamento)</label>
+                <select value={calcCostProductId} onChange={(e) => setCalcCostProductId(e.target.value)}>
+                  <option value="">— informar custo manualmente —</option>
+                  {costProducts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Custo do Produto (R$)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={selectedCostProduct ? String(selectedCostProduct.totalCost.toFixed(2)).replace(".", ",") : calcProductCost}
+                  onChange={(e) => setCalcProductCost(e.target.value)}
+                  disabled={!!selectedCostProduct}
+                />
+                {selectedCostProduct && (
+                  <span className="cost-from-product">
+                    vindo do orçamento de {selectedCostProduct.name} ({selectedCostProduct.items?.length || 0} itens)
+                  </span>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Custos Adicionais (R$)</label>
+                <input type="text" inputMode="decimal" placeholder="0,00" value={calcAdditionalCosts} onChange={(e) => setCalcAdditionalCosts(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Shopee Antecipa (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcShopeeAdvance} onChange={(e) => setCalcShopeeAdvance(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Imposto sobre Venda (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcSalesTax} onChange={(e) => setCalcSalesTax(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Margem de Lucro desejada (%)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcProfitMargin} onChange={(e) => setCalcProfitMargin(e.target.value)} disabled={!!calcManualSaleValue} />
+              </div>
+              <div className="form-group">
+                <label>Valor de Venda (manual, opcional)</label>
+                <input type="text" inputMode="decimal" placeholder="R$ 0,00" value={calcManualSaleValue} onChange={(e) => setCalcManualSaleValue(e.target.value)} />
+              </div>
+              <div className="form-group calc-checkbox">
+                <label>
+                  <input type="checkbox" checked={calcFeaturedCampaigns} onChange={(e) => setCalcFeaturedCampaigns(e.target.checked)} />
+                  Campanhas de Destaque (+2,5%)
+                </label>
+              </div>
+              <div className="form-group">
+                <label>% investida do lucro em ads (ROAS ativo)</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={calcAdsPercent} onChange={(e) => setCalcAdsPercent(e.target.value)} />
+              </div>
+              <div className="form-group calc-checkbox">
+                <label>
+                  <input type="checkbox" checked={calcAffiliateEnabled} onChange={(e) => setCalcAffiliateEnabled(e.target.checked)} />
+                  Comissão de Afiliado
+                </label>
+              </div>
+              <div className="form-group">
+                <label>Comissão de Afiliado (%)</label>
+                <input type="text" inputMode="decimal" placeholder="1" value={calcAffiliatePercent} onChange={(e) => setCalcAffiliatePercent(e.target.value)} disabled={!calcAffiliateEnabled} />
+              </div>
+            </div>
+
+            <p className="text-muted" style={{ marginTop: 12, fontSize: 13 }}>
+              💡 A comissão da Shopee usada aqui segue a tabela por faixa de preço (não é mais um % fixo): até R$79,99 → 20%+R$4; R$80–99,99 → 14%+R$16; R$100–199,99 → 14%+R$20; a partir de R$200 → 14%+R$26.
+              {calcBusinessType === "cpf" && " Vendedor pessoa física (CPF) tem uma taxa fixa adicional de R$3 por item."}
+              {" "}Desconto no Pix pro comprador é bancado pela própria Shopee, não sai do seu repasse — por isso não entra como custo aqui.
+              {" "}Valores de fonte pública (não é a documentação oficial da Shopee) — confira no seu extrato de repasse se bate.
+            </p>
+
+            {!calc.valid ? (
+              <p className="cost-warning" style={{ marginTop: 20 }}>{calc.reason}</p>
+            ) : (
+              <>
+                {calc.alertaFaixa && (
+                  <p className="cost-warning" style={{ marginTop: 20, background: "#fff8e1", borderColor: "#f0c419" }}>
+                    ⚠️ {calc.alertaFaixa}
+                  </p>
+                )}
+                <div className="calc-results">
+                  <div className="ov-card ov-card--revenue">
+                    <span className="ov-card__label">{calc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
+                    <span className="ov-card__value">{fmt(calc.precoVenda)}</span>
+                    <span className="ov-card__sub">
+                      Faixa: {calc.bracketAtual.max === Infinity ? `a partir de ${fmt(calc.bracketAtual.min)}` : `${fmt(calc.bracketAtual.min)} – ${fmt(calc.bracketAtual.max)}`} ({(calc.bracketAtual.rate * 100).toFixed(0)}% + {fmt(calc.bracketAtual.fixed)})
+                    </span>
+                  </div>
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Comissão Shopee (faixa)</span>
+                    <span className="ov-card__value">{fmt(calc.comissaoShopee)}</span>
+                  </div>
+                  {calc.cpfExtra > 0 && (
+                    <div className="ov-card ov-card--tax">
+                      <span className="ov-card__label">Taxa fixa CPF</span>
+                      <span className="ov-card__value">{fmt(calc.cpfExtra)}</span>
+                    </div>
+                  )}
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Taxas totais (Shopee + CPF + Imposto + Campanhas + Afiliado)</span>
+                    <span className="ov-card__value">{fmt(calc.taxasValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--commission">
+                    <span className="ov-card__label">Investimento em Ads</span>
+                    <span className="ov-card__value">{fmt(calc.adsValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--profit">
+                    <span className="ov-card__label">Lucro Bruto</span>
+                    <span className="ov-card__value">{fmt(calc.lucroBruto)}</span>
+                    <span className="ov-card__sub">Margem bruta: {calc.margemBruta.toFixed(1)}%</span>
+                  </div>
+                  <div className={`ov-card ${calc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
+                    <span className="ov-card__label">Lucro Líquido (após ads)</span>
+                    <span className="ov-card__value">{fmt(calc.lucroLiquido)}</span>
+                    <span className="ov-card__sub">Margem líquida: {calc.margemLiquida.toFixed(1)}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+            </div>
+            <div className="calc-col">
+          <div className="config-card">
+            <h3>Adicionar Produto</h3>
             <p className="text-muted">
               Monte o custo de um produto item por item. O total vira o preço de custo usado na Calculadora.
             </p>
@@ -1892,9 +2036,11 @@ export default function ShopeePage() {
               </>
             )}
           </div>
-
+            </div>
+          </div>
           <div className="config-card">
             <h3>Produtos Cadastrados</h3>
+            <p className="text-muted">Clique em "Histórico" pra ver as alterações de cada produto.</p>
             {costLoading ? (
               <p className="text-muted">Carregando...</p>
             ) : costProducts.length === 0 ? (
@@ -1912,210 +2058,56 @@ export default function ShopeePage() {
                 </thead>
                 <tbody>
                   {costProducts.map((p) => (
+                    <>
                     <tr key={p.id} className={activeProductId === p.id ? "cost-row--active" : ""}>
                       <td>{p.name}</td>
                       <td>{p.items?.length || 0}</td>
                       <td><strong>{fmt(p.totalCost)}</strong></td>
                       <td>{new Date(p.createdAt).toLocaleDateString("pt-BR")}</td>
-                      <td><button className="cost-btn-sec" onClick={() => setActiveProductId(p.id)}>Editar</button></td>
+                      <td className="cost-row-acoes">
+                        <button className="cost-btn-sec" onClick={() => setActiveProductId(p.id)}>Editar</button>
+                        <button className="cost-btn-sec" onClick={() => setHistProductId(histProductId === p.id ? null : p.id)}>
+                          {histProductId === p.id ? "Ocultar histórico" : "Histórico"}
+                        </button>
+                      </td>
                     </tr>
+                    {histProductId === p.id && (
+                      <tr key={`${p.id}-hist`} className="cost-hist-row">
+                        <td colSpan={5}>
+                          <strong className="cost-hist-title">Histórico de {p.name}</strong>
+                          {(p.changes?.length || 0) === 0 ? (
+                            <p className="text-muted">Nenhuma alteração registrada.</p>
+                          ) : (
+                            <table className="cost-table cost-table--hist">
+                              <thead>
+                                <tr>
+                                  <th>Data / Hora</th>
+                                  <th>Alteração</th>
+                                  <th>Responsável</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {p.changes.map((ch: any) => (
+                                  <tr key={ch.id}>
+                                    <td className="cost-hist-date">{new Date(ch.createdAt).toLocaleString("pt-BR")}</td>
+                                    <td>{ch.details}</td>
+                                    <td>{ch.userName}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
-
-          <div className="config-card">
-            <h3>Histórico de Alterações</h3>
-            {costProducts.length === 0 ? (
-              <p className="text-muted">Nenhuma alteração registrada.</p>
-            ) : (
-              <table className="cost-table">
-                <thead>
-                  <tr>
-                    <th>Data / Hora</th>
-                    <th>Produto</th>
-                    <th>Alteração</th>
-                    <th>Responsável</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {costProducts
-                    .flatMap((p) => (p.changes || []).map((ch: any) => ({ ...ch, productName: p.name })))
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice(0, 100)
-                    .map((ch) => (
-                      <tr key={ch.id}>
-                        <td className="cost-hist-date">{new Date(ch.createdAt).toLocaleString("pt-BR")}</td>
-                        <td>{ch.productName}</td>
-                        <td>{ch.details}</td>
-                        <td>{ch.userName}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-        </div>
         </div>
       )}
-
-      {activeTab === "calculator" && (
-        <div className="shopee-calculator">
-          <div className="config-card">
-            <h3>Calculadora de Preço e Margem</h3>
-            <p className="text-muted">Calcule o preço de venda ideal a partir da margem desejada, ou informe um valor de venda manual pra ver a margem resultante. Taxas ficam todas editáveis — ajuste conforme seu enquadramento.</p>
-
-            <div className="calc-toggle">
-              <button
-                type="button"
-                className={`calc-toggle__btn ${calcBusinessType === "cnpj" ? "calc-toggle__btn--active" : ""}`}
-                onClick={() => setCalcBusinessType("cnpj")}
-              >
-                🏢 CNPJ
-              </button>
-              <button
-                type="button"
-                className={`calc-toggle__btn ${calcBusinessType === "cpf" ? "calc-toggle__btn--active" : ""}`}
-                onClick={() => setCalcBusinessType("cpf")}
-              >
-                👤 CPF
-              </button>
-            </div>
-
-            <div className="calc-grid">
-              <div className="form-group">
-                <label>Produto cadastrado (orçamento)</label>
-                <div className="calc-product-row">
-                  <select value={calcCostProductId} onChange={(e) => setCalcCostProductId(e.target.value)}>
-                    <option value="">— informar custo manualmente —</option>
-                    {costProducts.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
-                    ))}
-                  </select>
-                  <button type="button" className="cost-btn-primary" onClick={() => setCostModalOpen(true)}>
-                    + Produto
-                  </button>
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Custo do Produto (R$)</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  value={selectedCostProduct ? String(selectedCostProduct.totalCost.toFixed(2)).replace(".", ",") : calcProductCost}
-                  onChange={(e) => setCalcProductCost(e.target.value)}
-                  disabled={!!selectedCostProduct}
-                />
-                {selectedCostProduct && (
-                  <span className="cost-from-product">
-                    vindo do orçamento de {selectedCostProduct.name} ({selectedCostProduct.items?.length || 0} itens)
-                  </span>
-                )}
-              </div>
-              <div className="form-group">
-                <label>Custos Adicionais (R$)</label>
-                <input type="text" inputMode="decimal" placeholder="0,00" value={calcAdditionalCosts} onChange={(e) => setCalcAdditionalCosts(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Shopee Antecipa (%)</label>
-                <input type="text" inputMode="decimal" placeholder="0" value={calcShopeeAdvance} onChange={(e) => setCalcShopeeAdvance(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Imposto sobre Venda (%)</label>
-                <input type="text" inputMode="decimal" placeholder="0" value={calcSalesTax} onChange={(e) => setCalcSalesTax(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label>Margem de Lucro desejada (%)</label>
-                <input type="text" inputMode="decimal" placeholder="0" value={calcProfitMargin} onChange={(e) => setCalcProfitMargin(e.target.value)} disabled={!!calcManualSaleValue} />
-              </div>
-              <div className="form-group">
-                <label>Valor de Venda (manual, opcional)</label>
-                <input type="text" inputMode="decimal" placeholder="R$ 0,00" value={calcManualSaleValue} onChange={(e) => setCalcManualSaleValue(e.target.value)} />
-              </div>
-              <div className="form-group calc-checkbox">
-                <label>
-                  <input type="checkbox" checked={calcFeaturedCampaigns} onChange={(e) => setCalcFeaturedCampaigns(e.target.checked)} />
-                  Campanhas de Destaque (+2,5%)
-                </label>
-              </div>
-              <div className="form-group">
-                <label>% investida do lucro em ads (ROAS ativo)</label>
-                <input type="text" inputMode="decimal" placeholder="0" value={calcAdsPercent} onChange={(e) => setCalcAdsPercent(e.target.value)} />
-              </div>
-              <div className="form-group calc-checkbox">
-                <label>
-                  <input type="checkbox" checked={calcAffiliateEnabled} onChange={(e) => setCalcAffiliateEnabled(e.target.checked)} />
-                  Comissão de Afiliado
-                </label>
-              </div>
-              <div className="form-group">
-                <label>Comissão de Afiliado (%)</label>
-                <input type="text" inputMode="decimal" placeholder="1" value={calcAffiliatePercent} onChange={(e) => setCalcAffiliatePercent(e.target.value)} disabled={!calcAffiliateEnabled} />
-              </div>
-            </div>
-
-            <p className="text-muted" style={{ marginTop: 12, fontSize: 13 }}>
-              💡 A comissão da Shopee usada aqui segue a tabela por faixa de preço (não é mais um % fixo): até R$79,99 → 20%+R$4; R$80–99,99 → 14%+R$16; R$100–199,99 → 14%+R$20; a partir de R$200 → 14%+R$26.
-              {calcBusinessType === "cpf" && " Vendedor pessoa física (CPF) tem uma taxa fixa adicional de R$3 por item."}
-              {" "}Desconto no Pix pro comprador é bancado pela própria Shopee, não sai do seu repasse — por isso não entra como custo aqui.
-              {" "}Valores de fonte pública (não é a documentação oficial da Shopee) — confira no seu extrato de repasse se bate.
-            </p>
-
-            {!calc.valid ? (
-              <p className="cost-warning" style={{ marginTop: 20 }}>{calc.reason}</p>
-            ) : (
-              <>
-                {calc.alertaFaixa && (
-                  <p className="cost-warning" style={{ marginTop: 20, background: "#fff8e1", borderColor: "#f0c419" }}>
-                    ⚠️ {calc.alertaFaixa}
-                  </p>
-                )}
-                <div className="calc-results">
-                  <div className="ov-card ov-card--revenue">
-                    <span className="ov-card__label">{calc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
-                    <span className="ov-card__value">{fmt(calc.precoVenda)}</span>
-                    <span className="ov-card__sub">
-                      Faixa: {calc.bracketAtual.max === Infinity ? `a partir de ${fmt(calc.bracketAtual.min)}` : `${fmt(calc.bracketAtual.min)} – ${fmt(calc.bracketAtual.max)}`} ({(calc.bracketAtual.rate * 100).toFixed(0)}% + {fmt(calc.bracketAtual.fixed)})
-                    </span>
-                  </div>
-                  <div className="ov-card ov-card--tax">
-                    <span className="ov-card__label">Comissão Shopee (faixa)</span>
-                    <span className="ov-card__value">{fmt(calc.comissaoShopee)}</span>
-                  </div>
-                  {calc.cpfExtra > 0 && (
-                    <div className="ov-card ov-card--tax">
-                      <span className="ov-card__label">Taxa fixa CPF</span>
-                      <span className="ov-card__value">{fmt(calc.cpfExtra)}</span>
-                    </div>
-                  )}
-                  <div className="ov-card ov-card--tax">
-                    <span className="ov-card__label">Taxas totais (Shopee + CPF + Imposto + Campanhas + Afiliado)</span>
-                    <span className="ov-card__value">{fmt(calc.taxasValor)}</span>
-                  </div>
-                  <div className="ov-card ov-card--commission">
-                    <span className="ov-card__label">Investimento em Ads</span>
-                    <span className="ov-card__value">{fmt(calc.adsValor)}</span>
-                  </div>
-                  <div className="ov-card ov-card--profit">
-                    <span className="ov-card__label">Lucro Bruto</span>
-                    <span className="ov-card__value">{fmt(calc.lucroBruto)}</span>
-                    <span className="ov-card__sub">Margem bruta: {calc.margemBruta.toFixed(1)}%</span>
-                  </div>
-                  <div className={`ov-card ${calc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
-                    <span className="ov-card__label">Lucro Líquido (após ads)</span>
-                    <span className="ov-card__value">{fmt(calc.lucroLiquido)}</span>
-                    <span className="ov-card__sub">Margem líquida: {calc.margemLiquida.toFixed(1)}%</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* CONFIGURAÇÃO */}
       {activeTab === "config" && (
         <div className="shopee-config">
