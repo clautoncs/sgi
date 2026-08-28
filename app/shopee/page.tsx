@@ -111,7 +111,7 @@ function shopeeCommissionFee(price: number): number {
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "cost_products" | "calculator" | "config">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "calculator" | "config">("overview");
   const [period, setPeriod] = useState<PeriodFilter>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -157,6 +157,7 @@ export default function ShopeePage() {
   const [itemForm, setItemForm] = useState({ description: "", quantity: "1", unitValue: "" });
   const [costSaving, setCostSaving] = useState(false);
   const [calcCostProductId, setCalcCostProductId] = useState("");
+  const [costModalOpen, setCostModalOpen] = useState(false);
 
   const [calcAffiliateEnabled, setCalcAffiliateEnabled] = useState(false);
   const [calcAffiliatePercent, setCalcAffiliatePercent] = useState("1");
@@ -463,8 +464,8 @@ export default function ShopeePage() {
   }, [status, activeTab, period, customFrom, customTo]);
 
   useEffect(() => {
-    if (activeTab === "cost_products" || activeTab === "calculator") fetchCostProducts();
-  }, [activeTab]);
+    if (activeTab === "calculator" || costModalOpen) fetchCostProducts();
+  }, [activeTab, costModalOpen]);
 
   const handleRefresh = () => {
     if (activeTab === "orders") trackProgress([fetchOrders()]);
@@ -1238,9 +1239,6 @@ export default function ShopeePage() {
         <button className={`shopee-tab ${activeTab === "orders" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("orders")}>
           Pedidos
         </button>
-        <button className={`shopee-tab ${activeTab === "cost_products" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("cost_products")}>
-          Produtos (Custo)
-        </button>
         <button className={`shopee-tab ${activeTab === "calculator" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("calculator")}>
           Calculadora
         </button>
@@ -1754,7 +1752,13 @@ export default function ShopeePage() {
       )}
 
       {/* CALCULADORA */}
-      {activeTab === "cost_products" && (
+      {costModalOpen && (
+        <div className="cost-modal-overlay" onClick={() => setCostModalOpen(false)}>
+        <div className="cost-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cost-modal-head">
+          <h2>Cadastro de Produtos (Orçamento de Custo)</h2>
+          <button className="cost-modal-close" onClick={() => setCostModalOpen(false)}>✕</button>
+        </div>
         <div className="shopee-cost-products">
           <div className="config-card">
             <h3>Cadastro de Produtos (Orçamento de Custo)</h3>
@@ -1953,6 +1957,8 @@ export default function ShopeePage() {
             )}
           </div>
         </div>
+        </div>
+        </div>
       )}
 
       {activeTab === "calculator" && (
@@ -1981,12 +1987,17 @@ export default function ShopeePage() {
             <div className="calc-grid">
               <div className="form-group">
                 <label>Produto cadastrado (orçamento)</label>
-                <select value={calcCostProductId} onChange={(e) => setCalcCostProductId(e.target.value)}>
-                  <option value="">— informar custo manualmente —</option>
-                  {costProducts.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
-                  ))}
-                </select>
+                <div className="calc-product-row">
+                  <select value={calcCostProductId} onChange={(e) => setCalcCostProductId(e.target.value)}>
+                    <option value="">— informar custo manualmente —</option>
+                    {costProducts.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
+                    ))}
+                  </select>
+                  <button type="button" className="cost-btn-primary" onClick={() => setCostModalOpen(true)}>
+                    + Produto
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <label>Custo do Produto (R$)</label>
