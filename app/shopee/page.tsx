@@ -158,6 +158,11 @@ export default function ShopeePage() {
   const [costSaving, setCostSaving] = useState(false);
   const [calcCostProductId, setCalcCostProductId] = useState("");
   const [histProductId, setHistProductId] = useState<string | null>(null);
+  // Variação em edição no formulário de itens ("" = itens base do produto)
+  const [activeVariationId, setActiveVariationId] = useState<string>("");
+  const [newVariationName, setNewVariationName] = useState("");
+  // Alvo da simulação aberta no pop-up
+  const [simTarget, setSimTarget] = useState<{ nome: string; custo: number } | null>(null);
 
   const [calcAffiliateEnabled, setCalcAffiliateEnabled] = useState(false);
   const [calcAffiliatePercent, setCalcAffiliatePercent] = useState("1");
@@ -760,6 +765,7 @@ export default function ShopeePage() {
         body: JSON.stringify({
           action: "add_item",
           productId: activeProductId,
+          variationId: activeVariationId || null,
           description: itemForm.description,
           quantity: Number(itemForm.quantity.replace(",", ".")) || 1,
           unitValue: Number(itemForm.unitValue.replace(",", ".")) || 0,
@@ -771,6 +777,35 @@ export default function ShopeePage() {
       }
     } finally {
       setCostSaving(false);
+    }
+  }
+
+  async function criarVariacao() {
+    if (!activeProductId || !newVariationName.trim()) return;
+    setCostSaving(true);
+    try {
+      const res = await fetch("/api/shopee-produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_variation", productId: activeProductId, name: newVariationName }),
+      });
+      if (res.ok) {
+        const v = await res.json();
+        setNewVariationName("");
+        setActiveVariationId(v.id);
+        fetchCostProducts();
+      }
+    } finally {
+      setCostSaving(false);
+    }
+  }
+
+  async function removerVariacao(variationId: string) {
+    if (!confirm("Remover esta variação e seus itens?")) return;
+    const res = await fetch(`/api/shopee-produtos?variationId=${variationId}`, { method: "DELETE" });
+    if (res.ok) {
+      if (activeVariationId === variationId) setActiveVariationId("");
+      fetchCostProducts();
     }
   }
 
@@ -793,13 +828,13 @@ export default function ShopeePage() {
   }
 
   const activeProduct = costProducts.find((p) => p.id === activeProductId) || null;
+  const activeVariation = activeProduct?.variations?.find((v: any) => v.id === activeVariationId) || null;
+  // Itens mostrados no formulário: os da variação selecionada, ou os base
+  const editingItems = activeVariation ? activeVariation.items : activeProduct?.baseItems || [];
   const selectedCostProduct = costProducts.find((p) => p.id === calcCostProductId) || null;
 
-  const calc = (() => {
-    // Se um produto de orçamento estiver selecionado, o custo vem dele
-    const custo = selectedCostProduct
-      ? selectedCostProduct.totalCost
-      : Number(calcProductCost.replace(",", ".")) || 0;
+  // Cálculo puro, reutilizado pela Calculadora e pelas simulações de produto
+  function computeCalc(custo: number) {
     const custosAdicionais = Number(calcAdditionalCosts.replace(",", ".")) || 0;
     const custoTotal = custo + custosAdicionais;
     const shopeeAntecipa = (Number(calcShopeeAdvance.replace(",", ".")) || 0) / 100;
@@ -897,7 +932,13 @@ export default function ShopeePage() {
       margemBruta,
       margemLiquida,
     };
-  })();
+  }
+
+  const calcCustoBase = selectedCostProduct
+    ? selectedCostProduct.totalCost
+    : Number(calcProductCost.replace(",", ".")) || 0;
+  const calc = computeCalc(calcCustoBase);
+  const simCalc = simTarget ? computeCalc(simTarget.custo) : null;
 
   const renderPieTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
@@ -1937,10 +1978,50 @@ export default function ShopeePage() {
 
             {activeProduct && (
               <>
+                <div className="cost-variations">
+                  <label className="cost-var-label">Variações de {activeProduct.name}</label>
+                  <div className="cost-var-chips">
+                    <button
+                      type="button"
+                      className={`cost-var-chip ${!activeVariationId ? "cost-var-chip--active" : ""}`}
+                      onClick={() => setActiveVariationId("")}
+                    >
+                      Base ({fmt(activeProduct.baseCost)})
+                    </button>
+                    {(activeProduct.variations || []).map((v: any) => (
+                      <span key={v.id} className="cost-var-wrap">
+                        <button
+                          type="button"
+                          className={`cost-var-chip ${activeVariationId === v.id ? "cost-var-chip--active" : ""}`}
+                          onClick={() => setActiveVariationId(v.id)}
+                        >
+                          {v.name} ({fmt(v.totalCost)})
+                        </button>
+                        <button type="button" className="cost-var-del" onClick={() => removerVariacao(v.id)} title="Remover variação">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="cost-var-new">
+                    <input
+                      type="text"
+                      placeholder="Nova variação (ex: Com monitor 18,5 pol)"
+                      value={newVariationName}
+                      onChange={(e) => setNewVariationName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && criarVariacao()}
+                    />
+                    <button className="cost-btn-sec" onClick={criarVariacao} disabled={costSaving || !newVariationName.trim()}>
+                      + Variação
+                    </button>
+                  </div>
+                  <p className="text-muted cost-var-hint">
+                    Os itens <strong>Base</strong> valem pra todas as variações; cada variação soma os itens próprios por cima.
+                  </p>
+                </div>
+
                 <div className="cost-item-form">
                   <div className="cost-item-form__seq">
                     <label>Item</label>
-                    <span className="cost-next-seq">#{(activeProduct.items?.length || 0) + 1}</span>
+                    <span className="cost-next-seq">#{(editingItems?.length || 0) + 1}</span>
                   </div>
                   <div className="cost-item-form__desc">
                     <label>Descrição</label>
@@ -1982,8 +2063,10 @@ export default function ShopeePage() {
                   </button>
                 </div>
 
-                <h4 className="cost-subtitle">Itens de {activeProduct.name}</h4>
-                {(activeProduct.items?.length || 0) === 0 ? (
+                <h4 className="cost-subtitle">
+                  Itens {activeVariation ? `da variação ${activeVariation.name}` : "base"} de {activeProduct.name}
+                </h4>
+                {(editingItems?.length || 0) === 0 ? (
                   <p className="text-muted">Nenhum item ainda — cadastre o primeiro acima.</p>
                 ) : (
                   <table className="cost-table">
@@ -1998,7 +2081,7 @@ export default function ShopeePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {activeProduct.items.map((it: any) => (
+                      {editingItems.map((it: any) => (
                         <tr key={it.id}>
                           <td>#{it.seq}</td>
                           <td>
@@ -2027,8 +2110,14 @@ export default function ShopeePage() {
                         </tr>
                       ))}
                       <tr className="cost-table__total">
-                        <td colSpan={4}>Custo total do produto</td>
-                        <td colSpan={2}><strong>{fmt(activeProduct.totalCost)}</strong></td>
+                        <td colSpan={4}>
+                          {activeVariation
+                            ? `Custo da variação ${activeVariation.name} (base + itens próprios)`
+                            : "Custo base do produto"}
+                        </td>
+                        <td colSpan={2}>
+                          <strong>{fmt(activeVariation ? activeVariation.totalCost : activeProduct.baseCost)}</strong>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -2065,12 +2154,25 @@ export default function ShopeePage() {
                       <td><strong>{fmt(p.totalCost)}</strong></td>
                       <td>{new Date(p.createdAt).toLocaleDateString("pt-BR")}</td>
                       <td className="cost-row-acoes">
-                        <button className="cost-btn-sec" onClick={() => setActiveProductId(p.id)}>Editar</button>
+                        <button className="cost-btn-sec" onClick={() => { setActiveProductId(p.id); setActiveVariationId(""); }}>Editar</button>
+                        <button className="cost-btn-sec" onClick={() => setSimTarget({ nome: p.name, custo: p.totalCost })}>Simular</button>
                         <button className="cost-btn-sec" onClick={() => setHistProductId(histProductId === p.id ? null : p.id)}>
                           {histProductId === p.id ? "Ocultar histórico" : "Histórico"}
                         </button>
                       </td>
                     </tr>
+                    {(p.variations || []).map((v: any) => (
+                      <tr key={v.id} className="cost-var-row">
+                        <td>↳ {v.name}</td>
+                        <td>{v.items?.length || 0}</td>
+                        <td><strong>{fmt(v.totalCost)}</strong></td>
+                        <td className="text-muted">+{fmt(v.extraCost)} sobre a base</td>
+                        <td className="cost-row-acoes">
+                          <button className="cost-btn-sec" onClick={() => { setActiveProductId(p.id); setActiveVariationId(v.id); }}>Editar</button>
+                          <button className="cost-btn-sec" onClick={() => setSimTarget({ nome: `${p.name} — ${v.name}`, custo: v.totalCost })}>Simular</button>
+                        </td>
+                      </tr>
+                    ))}
                     {histProductId === p.id && (
                       <tr key={`${p.id}-hist`} className="cost-hist-row">
                         <td colSpan={5}>
@@ -2108,6 +2210,85 @@ export default function ShopeePage() {
           </div>
         </div>
       )}
+
+      {simTarget && simCalc && (
+        <div className="sim-modal-overlay" onClick={() => setSimTarget(null)}>
+          <div className="sim-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sim-modal-head">
+              <div>
+                <h3>Simulação — {simTarget.nome}</h3>
+                <p className="text-muted">
+                  Custo do produto: <strong>{fmt(simTarget.custo)}</strong> · usa as mesmas taxas e margem da Calculadora
+                </p>
+              </div>
+              <button className="sim-modal-close" onClick={() => setSimTarget(null)}>✕</button>
+            </div>
+
+            <div className="sim-quick">
+              <div className="form-group">
+                <label>Margem desejada (%)</label>
+                <input type="text" inputMode="decimal" value={calcProfitMargin} onChange={(e) => setCalcProfitMargin(e.target.value)} disabled={!!calcManualSaleValue} />
+              </div>
+              <div className="form-group">
+                <label>Valor de Venda (manual)</label>
+                <input type="text" inputMode="decimal" placeholder="R$ 0,00" value={calcManualSaleValue} onChange={(e) => setCalcManualSaleValue(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Imposto sobre Venda (%)</label>
+                <input type="text" inputMode="decimal" value={calcSalesTax} onChange={(e) => setCalcSalesTax(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>% do lucro em ads</label>
+                <input type="text" inputMode="decimal" value={calcAdsPercent} onChange={(e) => setCalcAdsPercent(e.target.value)} />
+              </div>
+            </div>
+
+            {!simCalc.valid ? (
+              <p className="cost-warning">{simCalc.reason}</p>
+            ) : (
+              <>
+                {simCalc.alertaFaixa && (
+                  <p className="cost-warning" style={{ marginTop: 12, background: "#fff8e1", borderColor: "#f0c419" }}>
+                    ⚠️ {simCalc.alertaFaixa}
+                  </p>
+                )}
+                <div className="calc-results">
+                  <div className="ov-card ov-card--revenue">
+                    <span className="ov-card__label">{simCalc.modo === "reverso" ? "Valor de Venda (informado)" : "Preço de Venda Sugerido"}</span>
+                    <span className="ov-card__value">{fmt(simCalc.precoVenda)}</span>
+                    <span className="ov-card__sub">
+                      Faixa: {simCalc.bracketAtual.max === Infinity ? `a partir de ${fmt(simCalc.bracketAtual.min)}` : `${fmt(simCalc.bracketAtual.min)} – ${fmt(simCalc.bracketAtual.max)}`} ({(simCalc.bracketAtual.rate * 100).toFixed(0)}% + {fmt(simCalc.bracketAtual.fixed)})
+                    </span>
+                  </div>
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Comissão Shopee (faixa)</span>
+                    <span className="ov-card__value">{fmt(simCalc.comissaoShopee)}</span>
+                  </div>
+                  <div className="ov-card ov-card--tax">
+                    <span className="ov-card__label">Taxas totais</span>
+                    <span className="ov-card__value">{fmt(simCalc.taxasValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--commission">
+                    <span className="ov-card__label">Investimento em Ads</span>
+                    <span className="ov-card__value">{fmt(simCalc.adsValor)}</span>
+                  </div>
+                  <div className="ov-card ov-card--profit">
+                    <span className="ov-card__label">Lucro Bruto</span>
+                    <span className="ov-card__value">{fmt(simCalc.lucroBruto)}</span>
+                    <span className="ov-card__sub">Margem bruta: {simCalc.margemBruta.toFixed(1)}%</span>
+                  </div>
+                  <div className={`ov-card ${simCalc.lucroLiquido >= 0 ? "ov-card--profit" : "ov-card--loss"}`}>
+                    <span className="ov-card__label">Lucro Líquido (após ads)</span>
+                    <span className="ov-card__value">{fmt(simCalc.lucroLiquido)}</span>
+                    <span className="ov-card__sub">Margem líquida: {simCalc.margemLiquida.toFixed(1)}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* CONFIGURAÇÃO */}
       {activeTab === "config" && (
         <div className="shopee-config">

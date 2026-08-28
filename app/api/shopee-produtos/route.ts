@@ -28,14 +28,27 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: {
       items: { orderBy: { seq: "asc" } },
+      variations: { orderBy: { createdAt: "asc" } },
       changes: { orderBy: { createdAt: "desc" }, take: 50 },
     },
   });
 
-  const withTotals = products.map((p) => ({
-    ...p,
-    totalCost: p.items.reduce((s, i) => s + i.quantity * i.unitValue, 0),
-  }));
+  const withTotals = products.map((p) => {
+    const baseItems = p.items.filter((i) => !i.variationId);
+    const baseCost = baseItems.reduce((s, i) => s + i.quantity * i.unitValue, 0);
+    return {
+      ...p,
+      baseItems,
+      baseCost,
+      // custo total do produto = só os itens base (variações somam por cima)
+      totalCost: baseCost,
+      variations: p.variations.map((v) => {
+        const vItems = p.items.filter((i) => i.variationId === v.id);
+        const extra = vItems.reduce((s, i) => s + i.quantity * i.unitValue, 0);
+        return { ...v, items: vItems, extraCost: extra, totalCost: baseCost + extra };
+      }),
+    };
+  });
 
   return NextResponse.json({ products: withTotals });
 }
@@ -49,12 +62,12 @@ export async function POST(request: NextRequest) {
 
     // Cria um item dentro de um produto (numeração incremental automática)
     if (body.action === "add_item") {
-      const { productId, description, quantity, unitValue } = body;
+      const { productId, description, quantity, unitValue, variationId } = body;
       if (!productId || !description?.trim()) {
         return NextResponse.json({ error: "Produto e descrição são obrigatórios" }, { status: 400 });
       }
       const last = await prisma.costProductItem.findFirst({
-        where: { productId },
+        where: { productId, variationId: variationId || null },
         orderBy: { seq: "desc" },
         select: { seq: true },
       });
@@ -63,21 +76,40 @@ export async function POST(request: NextRequest) {
       const item = await prisma.costProductItem.create({
         data: {
           productId,
+          variationId: variationId || null,
           seq: (last?.seq ?? 0) + 1,
           description: description.trim(),
           quantity: qty,
           unitValue: unit,
         },
       });
+      const varName = variationId
+        ? (await prisma.costProductVariation.findUnique({ where: { id: variationId }, select: { name: true } }))?.name
+        : null;
       await prisma.costProductChange.create({
         data: {
           productId,
           action: "adicionou_item",
-          details: `Item ${item.seq}: ${item.description} — ${qty} × ${money(unit)} = ${money(qty * unit)}`,
+          details: `${varName ? `[${varName}] ` : ""}Item ${item.seq}: ${item.description} — ${qty} × ${money(unit)} = ${money(qty * unit)}`,
           userName,
         },
       });
       return NextResponse.json(item, { status: 201 });
+    }
+
+    // Cria uma variação do produto
+    if (body.action === "add_variation") {
+      const { productId, name } = body;
+      if (!productId || !name?.trim()) {
+        return NextResponse.json({ error: "Produto e nome da variação são obrigatórios" }, { status: 400 });
+      }
+      const variation = await prisma.costProductVariation.create({
+        data: { productId, name: name.trim() },
+      });
+      await prisma.costProductChange.create({
+        data: { productId, action: "adicionou_variacao", details: `Variação "${variation.name}" criada`, userName },
+      });
+      return NextResponse.json(variation, { status: 201 });
     }
 
     // Cria o produto (orçamento)
@@ -175,9 +207,20 @@ export async function DELETE(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const itemId = searchParams.get("itemId");
+  const variationId = searchParams.get("variationId");
   const id = searchParams.get("id");
 
   try {
+    if (variationId) {
+      const v = await prisma.costProductVariation.findUnique({ where: { id: variationId } });
+      if (!v) return NextResponse.json({ error: "Variação não encontrada" }, { status: 404 });
+      await prisma.costProductVariation.delete({ where: { id: variationId } });
+      await prisma.costProductChange.create({
+        data: { productId: v.productId, action: "removeu_variacao", details: `Variação "${v.name}" removida`, userName },
+      });
+      return NextResponse.json({ success: true });
+    }
+
     if (itemId) {
       const item = await prisma.costProductItem.findUnique({ where: { id: itemId } });
       if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
