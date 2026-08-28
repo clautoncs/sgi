@@ -171,6 +171,51 @@ model SystemSetting {
 }
 
 // ============================================================
+// ORÇAMENTO DE PRODUTO (Shopee) — composição de custo por itens
+// ============================================================
+
+model CostProduct {
+  id          String   @id @default(cuid())
+  name        String
+  notes       String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       CostProductItem[]
+  changes     CostProductChange[]
+
+  @@map("cost_products")
+}
+
+model CostProductItem {
+  id          String   @id @default(cuid())
+  seq         Int                // item incremental (1, 2, 3...)
+  description String
+  quantity    Float    @default(1)
+  unitValue   Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  product     CostProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+
+  @@map("cost_product_items")
+}
+
+model CostProductChange {
+  id          String   @id @default(cuid())
+  action      String             // criou_produto, adicionou_item, removeu_item, editou_item, renomeou, desativou...
+  details     String?  @db.Text  // descrição legível da alteração
+  userName    String             // quem fez
+  createdAt   DateTime @default(now())
+
+  product     CostProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+
+  @@map("cost_product_changes")
+}
+
+// ============================================================
 // PRODUTOS (cadastro interno pra controle de demanda/compras)
 // ============================================================
 

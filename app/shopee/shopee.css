@@ -993,3 +993,176 @@
     height: 150px;
   }
 }
+
+/* ===== Cadastro de Produtos (orçamento de custo) ===== */
+.shopee-cost-products {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cost-new-product {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.cost-new-product input {
+  flex: 1;
+  min-width: 240px;
+  padding: 10px 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.cost-btn-primary {
+  background: #ee4d2d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cost-btn-primary:hover { background: #d63d1f; }
+.cost-btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+.cost-btn-sec {
+  background: var(--line);
+  color: var(--text);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.cost-btn-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cost-product-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.cost-product-picker label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cost-product-picker select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  font-size: 0.88rem;
+  min-width: 280px;
+}
+
+.cost-item-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.cost-item-form label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.cost-item-form input {
+  padding: 8px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.cost-item-form__desc { flex: 1; min-width: 220px; }
+.cost-item-form__desc input { width: 100%; }
+.cost-item-form__qty input,
+.cost-item-form__unit input { width: 100px; }
+
+.cost-next-seq,
+.cost-total-preview {
+  display: inline-block;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.cost-subtitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.cost-table th,
+.cost-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.cost-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.cost-table__total td {
+  border-top: 2px solid var(--line);
+  border-bottom: none;
+  font-size: 0.95rem;
+  padding-top: 12px;
+}
+
+.cost-row--active { background: rgba(238, 77, 45, 0.07); }
+
+.cost-inline {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 5px;
+  font-size: 0.83rem;
+}
+
+.cost-inline--sm { width: 80px; }
+
+.cost-hist-date {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cost-from-product {
+  display: block;
+  font-size: 0.75rem;
+  color: #ee4d2d;
+  margin-top: 4px;
+}

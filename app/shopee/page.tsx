@@ -111,7 +111,7 @@ function shopeeCommissionFee(price: number): number {
 export default function ShopeePage() {
   const [status, setStatus] = useState<ShopeeStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "calculator" | "config">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "dashboard" | "products" | "orders" | "cost_products" | "calculator" | "config">("overview");
   const [period, setPeriod] = useState<PeriodFilter>("today");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -149,6 +149,15 @@ export default function ShopeePage() {
   const [calcManualSaleValue, setCalcManualSaleValue] = useState("");
   const [calcFeaturedCampaigns, setCalcFeaturedCampaigns] = useState(false);
   const [calcAdsPercent, setCalcAdsPercent] = useState("");
+  // Cadastro de produtos (orçamento de custo por itens)
+  const [costProducts, setCostProducts] = useState<any[]>([]);
+  const [costLoading, setCostLoading] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [itemForm, setItemForm] = useState({ description: "", quantity: "1", unitValue: "" });
+  const [costSaving, setCostSaving] = useState(false);
+  const [calcCostProductId, setCalcCostProductId] = useState("");
+
   const [calcAffiliateEnabled, setCalcAffiliateEnabled] = useState(false);
   const [calcAffiliatePercent, setCalcAffiliatePercent] = useState("1");
 
@@ -453,6 +462,10 @@ export default function ShopeePage() {
     if (activeTab === "dashboard") fetchDashboardData();
   }, [status, activeTab, period, customFrom, customTo]);
 
+  useEffect(() => {
+    if (activeTab === "cost_products" || activeTab === "calculator") fetchCostProducts();
+  }, [activeTab]);
+
   const handleRefresh = () => {
     if (activeTab === "orders") trackProgress([fetchOrders()]);
     if (activeTab === "products") trackProgress([fetchProducts()]);
@@ -703,8 +716,89 @@ export default function ShopeePage() {
   // e calcula a margem resultante). Taxas ficam todas editáveis pelo usuário
   // porque a alíquota real varia por CNPJ/CPF e por conta — não tem como
   // cravar um número oficial aqui.
+  async function fetchCostProducts() {
+    setCostLoading(true);
+    try {
+      const res = await fetch("/api/shopee-produtos");
+      if (res.ok) {
+        const data = await res.json();
+        setCostProducts(data.products || []);
+      }
+    } finally {
+      setCostLoading(false);
+    }
+  }
+
+  async function criarProduto() {
+    if (!newProductName.trim()) return;
+    setCostSaving(true);
+    try {
+      const res = await fetch("/api/shopee-produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProductName }),
+      });
+      if (res.ok) {
+        const p = await res.json();
+        setNewProductName("");
+        setActiveProductId(p.id);
+        fetchCostProducts();
+      }
+    } finally {
+      setCostSaving(false);
+    }
+  }
+
+  async function criarItem() {
+    if (!activeProductId || !itemForm.description.trim()) return;
+    setCostSaving(true);
+    try {
+      const res = await fetch("/api/shopee-produtos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_item",
+          productId: activeProductId,
+          description: itemForm.description,
+          quantity: Number(itemForm.quantity.replace(",", ".")) || 1,
+          unitValue: Number(itemForm.unitValue.replace(",", ".")) || 0,
+        }),
+      });
+      if (res.ok) {
+        setItemForm({ description: "", quantity: "1", unitValue: "" });
+        fetchCostProducts();
+      }
+    } finally {
+      setCostSaving(false);
+    }
+  }
+
+  async function removerItem(itemId: string) {
+    if (!confirm("Remover este item do orçamento?")) return;
+    const res = await fetch(`/api/shopee-produtos?itemId=${itemId}`, { method: "DELETE" });
+    if (res.ok) fetchCostProducts();
+  }
+
+  async function atualizarItem(itemId: string, field: string, value: string) {
+    const payload: any = { action: "update_item", itemId };
+    if (field === "description") payload.description = value;
+    else payload[field] = Number(value.replace(",", ".")) || 0;
+    const res = await fetch("/api/shopee-produtos", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) fetchCostProducts();
+  }
+
+  const activeProduct = costProducts.find((p) => p.id === activeProductId) || null;
+  const selectedCostProduct = costProducts.find((p) => p.id === calcCostProductId) || null;
+
   const calc = (() => {
-    const custo = Number(calcProductCost.replace(",", ".")) || 0;
+    // Se um produto de orçamento estiver selecionado, o custo vem dele
+    const custo = selectedCostProduct
+      ? selectedCostProduct.totalCost
+      : Number(calcProductCost.replace(",", ".")) || 0;
     const custosAdicionais = Number(calcAdditionalCosts.replace(",", ".")) || 0;
     const custoTotal = custo + custosAdicionais;
     const shopeeAntecipa = (Number(calcShopeeAdvance.replace(",", ".")) || 0) / 100;
@@ -1143,6 +1237,9 @@ export default function ShopeePage() {
         </button>
         <button className={`shopee-tab ${activeTab === "orders" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("orders")}>
           Pedidos
+        </button>
+        <button className={`shopee-tab ${activeTab === "cost_products" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("cost_products")}>
+          Produtos (Custo)
         </button>
         <button className={`shopee-tab ${activeTab === "calculator" ? "shopee-tab--active" : ""}`} onClick={() => setActiveTab("calculator")}>
           Calculadora
@@ -1657,6 +1754,207 @@ export default function ShopeePage() {
       )}
 
       {/* CALCULADORA */}
+      {activeTab === "cost_products" && (
+        <div className="shopee-cost-products">
+          <div className="config-card">
+            <h3>Cadastro de Produtos (Orçamento de Custo)</h3>
+            <p className="text-muted">
+              Monte o custo de um produto item por item. O total vira o preço de custo usado na Calculadora.
+            </p>
+
+            <div className="cost-new-product">
+              <input
+                type="text"
+                placeholder="Nome do produto (ex: PC Office i3 8GB SSD)"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && criarProduto()}
+              />
+              <button className="cost-btn-primary" onClick={criarProduto} disabled={costSaving || !newProductName.trim()}>
+                + Novo Produto
+              </button>
+            </div>
+
+            {costProducts.length > 0 && (
+              <div className="cost-product-picker">
+                <label>Produto em edição:</label>
+                <select value={activeProductId || ""} onChange={(e) => setActiveProductId(e.target.value || null)}>
+                  <option value="">— selecione —</option>
+                  {costProducts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {activeProduct && (
+              <>
+                <div className="cost-item-form">
+                  <div className="cost-item-form__seq">
+                    <label>Item</label>
+                    <span className="cost-next-seq">#{(activeProduct.items?.length || 0) + 1}</span>
+                  </div>
+                  <div className="cost-item-form__desc">
+                    <label>Descrição</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Placa-mãe H61 + i3 2120"
+                      value={itemForm.description}
+                      onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && criarItem()}
+                    />
+                  </div>
+                  <div className="cost-item-form__qty">
+                    <label>Quantidade</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={itemForm.quantity}
+                      onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
+                    />
+                  </div>
+                  <div className="cost-item-form__unit">
+                    <label>Valor Unitário</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={itemForm.unitValue}
+                      onChange={(e) => setItemForm({ ...itemForm, unitValue: e.target.value })}
+                    />
+                  </div>
+                  <div className="cost-item-form__total">
+                    <label>Valor Total</label>
+                    <span className="cost-total-preview">
+                      {fmt((Number(itemForm.quantity.replace(",", ".")) || 0) * (Number(itemForm.unitValue.replace(",", ".")) || 0))}
+                    </span>
+                  </div>
+                  <button className="cost-btn-primary" onClick={criarItem} disabled={costSaving || !itemForm.description.trim()}>
+                    Criar Item
+                  </button>
+                </div>
+
+                <h4 className="cost-subtitle">Itens de {activeProduct.name}</h4>
+                {(activeProduct.items?.length || 0) === 0 ? (
+                  <p className="text-muted">Nenhum item ainda — cadastre o primeiro acima.</p>
+                ) : (
+                  <table className="cost-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Descrição</th>
+                        <th>Qtd.</th>
+                        <th>Valor Unit.</th>
+                        <th>Valor Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeProduct.items.map((it: any) => (
+                        <tr key={it.id}>
+                          <td>#{it.seq}</td>
+                          <td>
+                            <input
+                              className="cost-inline"
+                              defaultValue={it.description}
+                              onBlur={(e) => e.target.value !== it.description && atualizarItem(it.id, "description", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="cost-inline cost-inline--sm"
+                              defaultValue={String(it.quantity).replace(".", ",")}
+                              onBlur={(e) => atualizarItem(it.id, "quantity", e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="cost-inline cost-inline--sm"
+                              defaultValue={String(it.unitValue).replace(".", ",")}
+                              onBlur={(e) => atualizarItem(it.id, "unitValue", e.target.value)}
+                            />
+                          </td>
+                          <td><strong>{fmt(it.quantity * it.unitValue)}</strong></td>
+                          <td><button className="cost-btn-del" onClick={() => removerItem(it.id)}>🗑</button></td>
+                        </tr>
+                      ))}
+                      <tr className="cost-table__total">
+                        <td colSpan={4}>Custo total do produto</td>
+                        <td colSpan={2}><strong>{fmt(activeProduct.totalCost)}</strong></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="config-card">
+            <h3>Produtos Cadastrados</h3>
+            {costLoading ? (
+              <p className="text-muted">Carregando...</p>
+            ) : costProducts.length === 0 ? (
+              <p className="text-muted">Nenhum produto cadastrado ainda.</p>
+            ) : (
+              <table className="cost-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Itens</th>
+                    <th>Custo Total</th>
+                    <th>Criado em</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costProducts.map((p) => (
+                    <tr key={p.id} className={activeProductId === p.id ? "cost-row--active" : ""}>
+                      <td>{p.name}</td>
+                      <td>{p.items?.length || 0}</td>
+                      <td><strong>{fmt(p.totalCost)}</strong></td>
+                      <td>{new Date(p.createdAt).toLocaleDateString("pt-BR")}</td>
+                      <td><button className="cost-btn-sec" onClick={() => setActiveProductId(p.id)}>Editar</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="config-card">
+            <h3>Histórico de Alterações</h3>
+            {costProducts.length === 0 ? (
+              <p className="text-muted">Nenhuma alteração registrada.</p>
+            ) : (
+              <table className="cost-table">
+                <thead>
+                  <tr>
+                    <th>Data / Hora</th>
+                    <th>Produto</th>
+                    <th>Alteração</th>
+                    <th>Responsável</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costProducts
+                    .flatMap((p) => (p.changes || []).map((ch: any) => ({ ...ch, productName: p.name })))
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 100)
+                    .map((ch) => (
+                      <tr key={ch.id}>
+                        <td className="cost-hist-date">{new Date(ch.createdAt).toLocaleString("pt-BR")}</td>
+                        <td>{ch.productName}</td>
+                        <td>{ch.details}</td>
+                        <td>{ch.userName}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === "calculator" && (
         <div className="shopee-calculator">
           <div className="config-card">
@@ -1682,8 +1980,29 @@ export default function ShopeePage() {
 
             <div className="calc-grid">
               <div className="form-group">
+                <label>Produto cadastrado (orçamento)</label>
+                <select value={calcCostProductId} onChange={(e) => setCalcCostProductId(e.target.value)}>
+                  <option value="">— informar custo manualmente —</option>
+                  {costProducts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} — {fmt(p.totalCost)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
                 <label>Custo do Produto (R$)</label>
-                <input type="text" inputMode="decimal" placeholder="0,00" value={calcProductCost} onChange={(e) => setCalcProductCost(e.target.value)} />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={selectedCostProduct ? String(selectedCostProduct.totalCost.toFixed(2)).replace(".", ",") : calcProductCost}
+                  onChange={(e) => setCalcProductCost(e.target.value)}
+                  disabled={!!selectedCostProduct}
+                />
+                {selectedCostProduct && (
+                  <span className="cost-from-product">
+                    vindo do orçamento de {selectedCostProduct.name} ({selectedCostProduct.items?.length || 0} itens)
+                  </span>
+                )}
               </div>
               <div className="form-group">
                 <label>Custos Adicionais (R$)</label>
