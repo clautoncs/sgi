@@ -1,7 +1,9 @@
 .rastreio-container {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  /* recuo lateral total ~14px (30% dos 48px originais): o page-content já
+     aplica 24px, então o margin negativo devolve 10px de cada lado */
+  padding: 24px 0;
+  max-width: none;
+  margin: 0 -10px;
 }
 
 .rastreio-header {
