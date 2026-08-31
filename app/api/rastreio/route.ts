@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
         productId: body.productId || null,
         realValue: body.realValue != null && body.realValue !== "" ? Number(body.realValue) : null,
         realQuantity: body.realQuantity != null && body.realQuantity !== "" ? Number(body.realQuantity) : null,
+        usdTotal: body.usdTotal != null && body.usdTotal !== "" ? Number(body.usdTotal) : null,
         notes: body.notes || null,
         statusCategory: initial?.category ?? (body.statusCategory && STATUS_CATEGORIES.includes(body.statusCategory) ? body.statusCategory : null),
         statusRaw: initial?.raw || null,
@@ -200,6 +201,7 @@ export async function PUT(request: NextRequest) {
     if (updates.productId !== undefined) data.productId = updates.productId || null;
     if (updates.realValue !== undefined) data.realValue = updates.realValue != null && updates.realValue !== "" ? Number(updates.realValue) : null;
     if (updates.realQuantity !== undefined) data.realQuantity = updates.realQuantity != null && updates.realQuantity !== "" ? Number(updates.realQuantity) : null;
+    if (updates.usdTotal !== undefined) data.usdTotal = updates.usdTotal != null && updates.usdTotal !== "" ? Number(updates.usdTotal) : null;
     if (updates.notes !== undefined) data.notes = updates.notes;
 
     const updated = await prisma.trackingOrder.update({ where: { id }, data });

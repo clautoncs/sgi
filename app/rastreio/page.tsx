@@ -14,6 +14,7 @@ interface TrackingOrder {
   unitValue: number | null;
   realValue: number | null;
   realQuantity: number | null;
+  usdTotal: number | null;
   paymentMethod: string | null;
   shippingAddress: string | null;
   trackingCode: string;
@@ -51,6 +52,7 @@ const emptyForm = {
   productName: "",
   quantity: "",
   unitValue: "",
+  usdTotal: "",
   paymentMethod: "",
   shippingAddress: "",
   trackingCode: "",
@@ -60,7 +62,7 @@ const emptyForm = {
 type SortKey =
   | "orderDate" | "buyerPerson" | "accountName" | "sellerName" | "externalOrderId"
   | "productName" | "quantity" | "unitValue" | "realValue" | "realQuantity"
-  | "trackingCode" | "statusCategory";
+  | "usdTotal" | "trackingCode" | "statusCategory";
 
 // Colunas que o usuário pode ocultar pra caber na tela
 const TOGGLABLE_COLUMNS: { key: string; label: string }[] = [
@@ -75,6 +77,7 @@ const TOGGLABLE_COLUMNS: { key: string; label: string }[] = [
   { key: "unitValue", label: "Frete" },
   { key: "realValue", label: "Valor Real" },
   { key: "realQuantity", label: "Qtd. Real" },
+  { key: "usdTotal", label: "Total US$" },
   { key: "custoUnitReal", label: "Custo Unit. Real" },
 ];
 
@@ -185,6 +188,7 @@ export default function RastreioPage() {
           o.orderDate ? new Date(o.orderDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null,
           o.quantity != null ? String(o.quantity) : null,
           o.unitValue != null ? String(o.unitValue) : null,
+          o.usdTotal != null ? String(o.usdTotal) : null,
         ]
           .filter(Boolean)
           .some((f) => (f as string).toLowerCase().includes(q))
@@ -269,6 +273,7 @@ export default function RastreioPage() {
       productName: o.productName,
       quantity: o.quantity != null ? String(o.quantity) : "",
       unitValue: o.unitValue != null ? String(o.unitValue) : "",
+      usdTotal: o.usdTotal != null ? String(o.usdTotal) : "",
       paymentMethod: o.paymentMethod || "",
       shippingAddress: o.shippingAddress || "",
       trackingCode: o.trackingCode,
@@ -296,6 +301,7 @@ export default function RastreioPage() {
         productName: form.productName || "—",
         quantity: form.quantity || null,
         unitValue: form.unitValue ? form.unitValue.replace(",", ".") : null,
+        usdTotal: form.usdTotal ? form.usdTotal.replace(",", ".") : null,
         paymentMethod: form.paymentMethod || null,
         shippingAddress: form.shippingAddress || null,
         trackingCode: form.trackingCode,
@@ -383,7 +389,7 @@ export default function RastreioPage() {
   }
 
   // Salva valor real / quantidade real digitados direto na célula
-  async function saveRealField(id: string, field: "realValue" | "realQuantity", value: string) {
+  async function saveRealField(id: string, field: "realValue" | "realQuantity" | "usdTotal", value: string) {
     const parsed = value.trim() === "" ? null : Number(value.replace(",", "."));
     const res = await fetch("/api/rastreio", {
       method: "PUT",
@@ -554,6 +560,7 @@ export default function RastreioPage() {
                 {show("unitValue") && <th className="sortable" onClick={() => toggleSort("unitValue")}>Frete{sortIndicator("unitValue")}</th>}
                 {show("realValue") && <th className="sortable" onClick={() => toggleSort("realValue")}>Valor Real{sortIndicator("realValue")}</th>}
                 {show("realQuantity") && <th className="sortable" onClick={() => toggleSort("realQuantity")}>Qtd. Real{sortIndicator("realQuantity")}</th>}
+                {show("usdTotal") && <th className="sortable" onClick={() => toggleSort("usdTotal")}>Total US${sortIndicator("usdTotal")}</th>}
                 {show("custoUnitReal") && <th>Custo Unit. Real</th>}
                 <th className="sortable" onClick={() => toggleSort("trackingCode")}>Rastreamento{sortIndicator("trackingCode")}</th>
                 <th className="sortable" onClick={() => toggleSort("statusCategory")}>Status{sortIndicator("statusCategory")}</th>
@@ -610,6 +617,19 @@ export default function RastreioPage() {
                             placeholder="—"
                             defaultValue={o.realQuantity != null ? String(o.realQuantity) : ""}
                             onBlur={(e) => saveRealField(o.id, "realQuantity", e.target.value)}
+                          />
+                        </td>
+                      )}
+                      {show("usdTotal") && (
+                        <td>
+                          <input
+                            key={`usd-${o.id}-${o.usdTotal}`}
+                            type="text"
+                            inputMode="decimal"
+                            className="rastreio-inline-input rastreio-inline-input--qty"
+                            placeholder="—"
+                            defaultValue={o.usdTotal != null ? String(o.usdTotal).replace(".", ",") : ""}
+                            onBlur={(e) => saveRealField(o.id, "usdTotal", e.target.value)}
                           />
                         </td>
                       )}
@@ -726,6 +746,10 @@ export default function RastreioPage() {
               <div className="rastreio-form-group">
                 <label>Frete (R$)</label>
                 <input type="text" inputMode="decimal" placeholder="0,00" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} />
+              </div>
+              <div className="rastreio-form-group">
+                <label>Total pago em US$</label>
+                <input type="text" inputMode="decimal" placeholder="0,00" value={form.usdTotal} onChange={(e) => setForm({ ...form, usdTotal: e.target.value })} />
               </div>
               <div className="rastreio-form-group">
                 <label>Pagamento</label>
