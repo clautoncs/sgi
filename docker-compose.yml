@@ -1,10 +1,35 @@
 services:
+  db:
+    image: mysql:8.4
+    container_name: sgi-db
+    restart: unless-stopped
+    command: --innodb-buffer-pool-size=512M --max-connections=200
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: sgi
+      MYSQL_USER: sgi
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - /root/sgi-mysql-data:/var/lib/mysql
+    # só localhost: o banco não fica exposto à internet
+    ports:
+      - "127.0.0.1:3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
   app:
     build: .
     container_name: sgi
     restart: unless-stopped
     env_file:
       - .env
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - /root/metas.json:/app/metas.json
       - ./roles.json:/app/roles.json
