@@ -14,15 +14,67 @@ function getAuth() {
   return auth;
 }
 
-function parseMonthTab(monthStr: string): string {
-  // Converte "2026-08" para "AGOSTO-26"
-  const months: Record<string, string> = {
-    '01': 'JAN-26', '02': 'FEV-26', '03': 'MAR-26', '04': 'ABRIL',
-    '05': 'MAIO-26', '06': 'JUNHO-26', '07': 'JULHO-26', '08': 'AGOSTO-26',
-    '09': 'SET-26', '10': 'OUT-26', '11': 'NOV-26', '12': 'DEZ-26'
-  };
-  const [year, month] = monthStr.split('-');
-  return months[month] || `${month}-${year.slice(2)}`;
+// As abas da planilha não seguem um padrão único: convivem "MAR-26",
+// "SETEMBRO-26", "AGOSTO/2025", " SET/24", "NOV/23.", "ABRIL" (sem ano) e
+// até erros de digitação ("BR/24" = abril, "FER/24" = fevereiro). Por isso
+// lemos os nomes reais da planilha e interpretamos cada um, em vez de manter
+// uma lista fixa no código.
+const MONTH_TOKENS: Record<string, number> = {
+  JAN: 1, FEV: 2, FER: 2, MAR: 3, ABR: 4, BR: 4, MAI: 5, JUN: 6,
+  JUL: 7, AGO: 8, AGOS: 8, SET: 9, OUT: 10, NOV: 11, DEZ: 12,
+};
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // tira acentos
+    .toUpperCase()
+    .replace(/[.\s]+$/g, '')  // ponto/espaço no fim
+    .trim();
+}
+
+// Extrai mês e ano do nome de uma aba. Ano null = aba sem ano (ex: "ABRIL").
+export function interpretarAba(titulo: string): { mes: number; ano: number | null } | null {
+  const t = normalizar(titulo);
+  if (!t || /^(ACUMULADO|HISTORICO|RESUMO|TOTAL)/.test(t)) return null;
+
+  const partes = t.split(/[-\/]/).map((p) => p.trim()).filter(Boolean);
+  if (partes.length === 0) return null;
+
+  // mês: casa pelo prefixo mais longo (AGOS antes de AGO)
+  const nomeMes = partes[0].replace(/[^A-Z]/g, '');
+  let mes: number | null = null;
+  for (const token of Object.keys(MONTH_TOKENS).sort((a, b) => b.length - a.length)) {
+    if (nomeMes.startsWith(token)) { mes = MONTH_TOKENS[token]; break; }
+  }
+  if (!mes) return null;
+
+  // ano: 2 dígitos viram 20xx, 4 dígitos vão como estão
+  let ano: number | null = null;
+  if (partes[1]) {
+    const digitos = partes[1].replace(/\D/g, '');
+    if (digitos.length === 2) ano = 2000 + Number(digitos);
+    else if (digitos.length === 4) ano = Number(digitos);
+  }
+  return { mes, ano };
+}
+
+async function listarAbas(sheets: any, spreadsheetId: string): Promise<string[]> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties.title' });
+  return (meta.data.sheets || []).map((s: any) => s.properties.title as string);
+}
+
+// Encontra a aba correspondente a "2026-11". Prioriza quem tem o ano certo;
+// abas sem ano ("ABRIL") entram só como último recurso.
+function acharAba(titulos: string[], monthStr: string): string | null {
+  const [anoAlvo, mesAlvo] = monthStr.split('-').map(Number);
+  let semAno: string | null = null;
+  for (const titulo of titulos) {
+    const info = interpretarAba(titulo);
+    if (!info || info.mes !== mesAlvo) continue;
+    if (info.ano === anoAlvo) return titulo;
+    if (info.ano === null && !semAno) semAno = titulo;
+  }
+  return semAno;
 }
 
 export async function GET(request: Request) {
@@ -33,9 +85,37 @@ export async function GET(request: Request) {
     const auth = getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    
-    const tabName = parseMonthTab(month);
-    
+
+    const titulos = await listarAbas(sheets, spreadsheetId!);
+
+    // ?action=months — lista os meses que existem de fato na planilha
+    if (searchParams.get('action') === 'months') {
+      const meses = titulos
+        .map((titulo) => ({ titulo, info: interpretarAba(titulo) }))
+        .filter((x) => x.info && x.info.ano !== null)
+        .map((x) => ({
+          value: `${x.info!.ano}-${String(x.info!.mes).padStart(2, '0')}`,
+          aba: x.titulo,
+        }));
+      // abas sem ano só entram se aquele mês não tiver outra aba equivalente
+      for (const { titulo, info } of titulos.map((t) => ({ titulo: t, info: interpretarAba(t) }))) {
+        if (!info || info.ano !== null) continue;
+        const ehUnica = !meses.some((m) => Number(m.value.split('-')[1]) === info.mes);
+        if (ehUnica) meses.push({ value: `${new Date().getFullYear()}-${String(info.mes).padStart(2, '0')}`, aba: titulo });
+      }
+      const unicos = Array.from(new Map(meses.map((m) => [m.value, m])).values())
+        .sort((a, b) => b.value.localeCompare(a.value));
+      return NextResponse.json({ meses: unicos });
+    }
+
+    const tabName = acharAba(titulos, month);
+    if (!tabName) {
+      return NextResponse.json(
+        { error: `Não existe aba para ${month} nesta planilha`, vendas: [], resumo: {} },
+        { status: 404 }
+      );
+    }
+
     // Buscar dados da aba do mês
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,

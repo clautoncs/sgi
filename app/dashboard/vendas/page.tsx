@@ -118,6 +118,7 @@ export default function VendasDashboard() {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [vendaSelecionada, setVendaSelecionada] = useState<number | null>(null);
+  const [mesesDisponiveis, setMesesDisponiveis] = useState<{ value: string; label: string }[]>([]);
   const [diaSelecionado, setDiaSelecionado] = useState<string>(() => {
     const now = new Date();
     return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -161,15 +162,27 @@ export default function VendasDashboard() {
     return () => clearInterval(interval);
   }, [fetchDados]);
 
-  // Gerar opções de meses
-  const mesesDisponiveis = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(2026, 7 - i, 1);
-    mesesDisponiveis.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-    });
-  }
+  // As opções de mês vêm das abas que existem de fato na planilha —
+  // antes eram uma lista fixa que travava em agosto/2026.
+  useEffect(() => {
+    fetch('/api/sheets?action=months')
+      .then((r) => (r.ok ? r.json() : { meses: [] }))
+      .then((d) => {
+        const lista = (d.meses || []).map((m: any) => {
+          const [ano, mes] = m.value.split('-').map(Number);
+          return {
+            value: m.value,
+            label: new Date(ano, mes - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+          };
+        });
+        setMesesDisponiveis(lista);
+        // se o mês atual não tem aba, cai no mais recente que tiver
+        if (lista.length > 0 && !lista.some((m: any) => m.value === mesSelecionado)) {
+          setMesSelecionado(lista[0].value);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const getDiasNoMes = () => {
     const [ano, mes] = mesSelecionado.split('-').map(Number);
