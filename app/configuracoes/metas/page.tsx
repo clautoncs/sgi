@@ -86,13 +86,18 @@ export default function ConfigMetas() {
     });
   };
 
+  // Meses do mês atual pra trás e 12 à frente, pra dar pra definir meta de
+  // mês futuro (antes era uma lista fixa travada em agosto/2026).
   const mesesDisponiveis = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(2026, 7 - i, 1);
-    mesesDisponiveis.push({
-      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-    });
+  {
+    const hoje = new Date();
+    for (let i = 12; i >= -24; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      mesesDisponiveis.push({
+        value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+      });
+    }
   }
 
   return (
