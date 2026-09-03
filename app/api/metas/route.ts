@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getSetting, saveSetting } from '@/lib/settings';
 
-const METAS_FILE = path.join(process.cwd(), 'metas.json');
+async function nomeDoUsuario(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  const u = session?.user as any;
+  return u?.name || u?.email || 'Desconhecido';
+}
 
 async function readMetas(): Promise<Record<string, any>> {
-  try {
-    const data = await fs.readFile(METAS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
+  return getSetting<Record<string, any>>('metas', {});
 }
 
 async function writeMetas(metas: Record<string, any>): Promise<void> {
-  await fs.writeFile(METAS_FILE, JSON.stringify(metas, null, 2), 'utf-8');
+  await saveSetting('metas', metas, await nomeDoUsuario());
 }
 
 // GET - Buscar metas do mês

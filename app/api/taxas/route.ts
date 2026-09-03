@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getSetting, saveSetting } from "@/lib/settings";
 
-const TAXAS_FILE = "/app/taxas.json";
+async function nomeDoUsuario(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  const u = session?.user as any;
+  return u?.name || u?.email || "Desconhecido";
+}
 
 interface Canal {
   id: string;
@@ -21,23 +26,18 @@ interface TaxasDB {
 }
 
 async function readTaxas(): Promise<TaxasDB> {
-  try {
-    const data = await fs.readFile(TAXAS_FILE, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return {
+  return getSetting<TaxasDB>("taxas", {
       imposto: { label: "Imposto (NF)", percentual: 12.0, descricao: "Percentual de imposto sobre o total" },
       canais: [
         { id: "vendedor", label: "Vendedor (Loja)", percentual: 0, descricao: "Venda direta" },
         { id: "shopee", label: "Shopee", percentual: 20, descricao: "Comissão Shopee" },
-        { id: "licitador", label: "Licitador", percentual: 10, descricao: "Comissão licitação" },
-      ],
-    };
-  }
+      { id: "licitador", label: "Licitador", percentual: 10, descricao: "Comissão licitação" },
+    ],
+  });
 }
 
 async function writeTaxas(db: TaxasDB): Promise<void> {
-  await fs.writeFile(TAXAS_FILE, JSON.stringify(db, null, 2), "utf-8");
+  await saveSetting("taxas", db, await nomeDoUsuario());
 }
 
 export async function GET() {

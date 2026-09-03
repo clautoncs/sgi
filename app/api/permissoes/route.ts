@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getSetting, saveSetting } from "@/lib/settings";
 
-const ROLES_FILE = path.join(process.cwd(), "roles.json");
+async function nomeDoUsuario(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  const u = session?.user as any;
+  return u?.name || u?.email || "Desconhecido";
+}
 
 interface Permission {
   page: string;
@@ -37,22 +42,22 @@ interface RolesDB {
 }
 
 async function readRoles(): Promise<RolesDB> {
-  try {
-    const data = await fs.readFile(ROLES_FILE, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return {
-      defaultRole: "role_viewer",
-      defaultEstoqueProfile: "varejo",
-      pages: [],
-      estoqueProfiles: [],
-      roles: [],
-    };
-  }
+  return getSetting<RolesDB>("roles", {
+    defaultRole: "role_viewer",
+    defaultEstoqueProfile: "varejo",
+    pages: [],
+    estoqueProfiles: [],
+    roles: [],
+  });
 }
 
 async function writeRoles(db: RolesDB): Promise<void> {
-  await fs.writeFile(ROLES_FILE, JSON.stringify(db, null, 2), "utf-8");
+  // Guarda de segurança: nunca gravar uma estrutura de permissões vazia —
+  // um erro aqui tira o acesso de todo mundo, inclusive dos administradores.
+  if (!Array.isArray(db.roles) || db.roles.length === 0) {
+    throw new Error("Recusado: gravação deixaria o sistema sem nenhum perfil de acesso");
+  }
+  await saveSetting("roles", db, await nomeDoUsuario());
 }
 
 // GET - Listar perfis, permissões e configurações
