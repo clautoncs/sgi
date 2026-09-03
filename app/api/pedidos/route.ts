@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+// Sem isto a rota fica aberta na internet: o middleware protege as paginas,
+// nao as APIs.
+async function requireSession() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+  return null;
+}
+
 const PEDIDOS_PATH = '/app/data/pedidos.json';
 
 interface ItemPedido {
@@ -55,6 +68,9 @@ function generateId(): string {
 }
 
 export async function GET(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const status = searchParams.get('status');
@@ -81,6 +97,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const pedidos = loadPedidos();
@@ -115,6 +134,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { id, action, ...updates } = body;
@@ -168,6 +190,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   

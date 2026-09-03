@@ -3,6 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { getSetting, saveSetting } from '@/lib/settings';
 
+// Sem isto a rota fica aberta na internet: o middleware protege as paginas,
+// nao as APIs.
+async function requireSession() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+  return null;
+}
+
 async function nomeDoUsuario(): Promise<string> {
   const session = await getServerSession(authOptions);
   const u = session?.user as any;
@@ -19,6 +29,9 @@ async function writeMetas(metas: Record<string, any>): Promise<void> {
 
 // GET - Buscar metas do mês
 export async function GET(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
@@ -41,6 +54,9 @@ export async function GET(request: Request) {
 
 // POST - Salvar/atualizar metas
 export async function POST(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { month, metaGeral, metasPorVendedor } = body;

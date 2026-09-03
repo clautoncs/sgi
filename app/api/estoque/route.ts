@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 import { readFileSync } from "fs";
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+// Sem isto a rota fica aberta na internet: o middleware protege as paginas,
+// nao as APIs.
+async function requireSession() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
+  }
+  return null;
+}
+
 function getAuth() {
   const credPath = process.env.GOOGLE_CREDENTIALS_PATH || "/app/google-credentials.json";
   const credentials = JSON.parse(readFileSync(credPath, "utf-8"));
@@ -120,6 +133,9 @@ function parseComponentes(rows: any[][]): any[] {
 }
 
 export async function GET(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const categoria = searchParams.get("categoria");
