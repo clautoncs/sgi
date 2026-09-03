@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -13,6 +14,13 @@ async function requireSession() {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
   return null;
+}
+
+// Quem fez a alteração, para o histórico de custos
+async function nomeDoUsuario(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  const u = session?.user as any;
+  return u?.name || u?.email || "Desconhecido";
 }
 
 async function requireAdmin() {
@@ -28,42 +36,30 @@ async function requireAdmin() {
 }
 
 const CONFIG_PATH = "/app/shopee-config.json";
-const COSTS_PATH = "/app/shopee-costs.json";
-const EXTRA_COST_PATHS: Record<string, string> = {
-  freight: "/app/shopee-freight.json",
-  packaging: "/app/shopee-packaging.json",
-};
+// Custos por produto (custo, frete manual e embalagem) agora vivem no
+// banco — antes eram três arquivos JSON no disco, sem histórico e sujeitos
+// a problema de permissão. A chave é item_id ou "item_id:model_id".
+const EXTRA_COST_TYPES = ["freight", "packaging"];
 
-function getCosts(): Record<string, number> {
-  try {
-    const raw = fs.readFileSync(COSTS_PATH, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
+async function getCostsByType(type: string): Promise<Record<string, number>> {
+  const linhas = await prisma.shopeeItemCost.findMany({ where: { type } });
+  return Object.fromEntries(linhas.map((l) => [l.itemKey, l.value]));
 }
 
-function saveCosts(costs: Record<string, number>) {
-  fs.writeFileSync(COSTS_PATH, JSON.stringify(costs, null, 2));
-}
+async function saveCostByType(type: string, itemKey: string, value: number, userName: string) {
+  const anterior = await prisma.shopeeItemCost.findUnique({
+    where: { type_itemKey: { type, itemKey } },
+  });
+  if (anterior?.value === value) return; // nada mudou, não polui o histórico
 
-// Frete manual (sobrepõe o rateio automático do frete real do pedido) e
-// custo de embalagem — mesmo esquema de arquivo por item_id[:model_id] do
-// getCosts/saveCosts acima, só que num arquivo por tipo.
-function getExtraCosts(type: string): Record<string, number> {
-  const path = EXTRA_COST_PATHS[type];
-  if (!path) return {};
-  try {
-    return JSON.parse(fs.readFileSync(path, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-function saveExtraCosts(type: string, values: Record<string, number>) {
-  const path = EXTRA_COST_PATHS[type];
-  if (!path) return;
-  fs.writeFileSync(path, JSON.stringify(values, null, 2));
+  await prisma.shopeeItemCost.upsert({
+    where: { type_itemKey: { type, itemKey } },
+    create: { type, itemKey, value },
+    update: { value },
+  });
+  await prisma.shopeeItemCostChange.create({
+    data: { type, itemKey, oldValue: anterior?.value ?? null, newValue: value, userName },
+  });
 }
 
 interface ShopeeConfig {
@@ -592,16 +588,16 @@ export async function GET(req: NextRequest) {
 
   // Custos cadastrados por produto (para cálculo de margem real)
   if (action === "costs") {
-    return NextResponse.json({ costs: getCosts() });
+    return NextResponse.json({ costs: await getCostsByType("cost") });
   }
 
   // Frete manual e custo de embalagem por produto
   if (action === "extra_costs") {
     const type = searchParams.get("type") || "";
-    if (!EXTRA_COST_PATHS[type]) {
+    if (!EXTRA_COST_TYPES.includes(type)) {
       return NextResponse.json({ error: "type inválido (use freight ou packaging)" }, { status: 400 });
     }
-    return NextResponse.json({ costs: getExtraCosts(type) });
+    return NextResponse.json({ costs: await getCostsByType(type) });
   }
 
   return NextResponse.json({ error: "Ação inválida" }, { status: 400 });
@@ -626,9 +622,7 @@ export async function POST(req: NextRequest) {
     if (!itemId || !Number.isFinite(cost) || cost < 0) {
       return NextResponse.json({ error: "itemId e cost (>= 0) são obrigatórios" }, { status: 400 });
     }
-    const costs = getCosts();
-    costs[itemId] = cost;
-    saveCosts(costs);
+    await saveCostByType("cost", itemId, cost, await nomeDoUsuario());
     return NextResponse.json({ success: true });
   }
 
@@ -637,15 +631,13 @@ export async function POST(req: NextRequest) {
     const type = String(body.type || "");
     const itemId = String(body.itemId || "");
     const value = Number(body.value);
-    if (!EXTRA_COST_PATHS[type]) {
+    if (!EXTRA_COST_TYPES.includes(type)) {
       return NextResponse.json({ error: "type inválido (use freight ou packaging)" }, { status: 400 });
     }
     if (!itemId || !Number.isFinite(value) || value < 0) {
       return NextResponse.json({ error: "itemId e value (>= 0) são obrigatórios" }, { status: 400 });
     }
-    const values = getExtraCosts(type);
-    values[itemId] = value;
-    saveExtraCosts(type, values);
+    await saveCostByType(type, itemId, value, await nomeDoUsuario());
     return NextResponse.json({ success: true });
   }
 

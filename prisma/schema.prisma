@@ -171,6 +171,39 @@ model SystemSetting {
 }
 
 // ============================================================
+// CUSTOS POR PRODUTO DA SHOPEE (custo, frete manual, embalagem)
+// Substitui shopee-costs.json / -freight.json / -packaging.json.
+// ============================================================
+
+model ShopeeItemCost {
+  id        String   @id @default(cuid())
+  // "cost" (custo do produto) | "freight" (frete manual) | "packaging" (embalagem)
+  type      String
+  // item_id da Shopee, ou "item_id:model_id" quando é variação
+  itemKey   String
+  value     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, itemKey])
+  @@index([type])
+  @@map("shopee_item_costs")
+}
+
+model ShopeeItemCostChange {
+  id        String   @id @default(cuid())
+  type      String
+  itemKey   String
+  oldValue  Float?             // null quando é o primeiro valor
+  newValue  Float
+  userName  String
+  createdAt DateTime @default(now())
+
+  @@index([type, itemKey])
+  @@map("shopee_item_cost_changes")
+}
+
+// ============================================================
 // ORÇAMENTO DE PRODUTO (Shopee) — composição de custo por itens
 // ============================================================
 
